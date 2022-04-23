@@ -734,6 +734,9 @@ namespace Walnut {
 		check_vk_result(err);
 
 		vkDestroyFence(g_Device, fence, nullptr);
+		ImGui_ImplVulkanH_Window* wd = &g_MainWindowData;
+		VkCommandPool command_pool = wd->Frames[wd->FrameIndex].CommandPool;
+		vkFreeCommandBuffers(g_Device, command_pool, 1, &commandBuffer);
 	}
 
 
