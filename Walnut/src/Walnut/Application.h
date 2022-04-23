@@ -43,6 +43,8 @@ namespace Walnut {
 
 		void Close();
 
+		GLFWwindow* GetWindowHandle();
+
 		static VkInstance GetInstance();
 		static VkPhysicalDevice GetPhysicalDevice();
 		static VkDevice GetDevice();

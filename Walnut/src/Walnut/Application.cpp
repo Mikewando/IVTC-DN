@@ -668,6 +668,11 @@ namespace Walnut {
 		m_Running = false;
 	}
 
+	GLFWwindow* Application::GetWindowHandle()
+	{
+		return m_WindowHandle;
+	}
+
 	VkInstance Application::GetInstance()
 	{
 		return g_Instance;
