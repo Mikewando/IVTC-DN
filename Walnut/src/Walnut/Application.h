@@ -45,6 +45,8 @@ namespace Walnut {
 
 		GLFWwindow* GetWindowHandle();
 
+		ImFont* m_UbuntuMonoFont;
+
 		static VkInstance GetInstance();
 		static VkPhysicalDevice GetPhysicalDevice();
 		static VkDevice GetDevice();

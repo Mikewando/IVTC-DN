@@ -17,6 +17,7 @@
 
 // Emedded font
 #include "ImGui/Roboto-Regular.embed"
+#include "ImGui/UbuntuMono.embed"
 
 extern bool g_ApplicationRunning;
 
@@ -474,6 +475,7 @@ namespace Walnut {
 		ImFontConfig fontConfig;
 		fontConfig.FontDataOwnedByAtlas = false;
 		ImFont* robotoFont = io.Fonts->AddFontFromMemoryTTF((void*)g_RobotoRegular, sizeof(g_RobotoRegular), 20.0f, &fontConfig);
+		ImFont* m_UbuntuMonoFont = io.Fonts->AddFontFromMemoryCompressedTTF(UbuntuMono_compressed_data, UbuntuMono_compressed_size, 64.0f, &fontConfig);
 		io.FontDefault = robotoFont;
 
 		// Upload Fonts
