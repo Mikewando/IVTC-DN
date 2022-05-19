@@ -277,7 +277,7 @@ private:
 	int m_FramesFrameCount = 0;
 	std::shared_ptr<Walnut::Image> m_Frames[4];
 
-	void Resize(VSCore* core, VSNode* &node, int64_t width, int64_t height) {
+	VSNode* Resize(VSCore* core, VSNode* &node, int64_t width, int64_t height) {
 		VSMap* argument_map = m_VSAPI->createMap();
 		VSPlugin* resize_plugin = m_VSAPI->getPluginByID("com.vapoursynth.resize", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
@@ -290,12 +290,13 @@ private:
 			fprintf(stderr, "%s\n", result_error);
 		}
 
-		node = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
 		m_VSAPI->freeMap(argument_map);
 		m_VSAPI->freeMap(result_map);
+		return output;
 	}
 
-	void ConvertToRGB(VSCore* core, VSNode* &node) {
+	VSNode* ConvertToRGB(VSCore* core, VSNode* &node) {
 		VSMap* argument_map = m_VSAPI->createMap();
 		VSPlugin* resize_plugin = m_VSAPI->getPluginByID("com.vapoursynth.resize", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
@@ -308,12 +309,13 @@ private:
 			fprintf(stderr, "%s\n", result_error);
 		}
 
-		node = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
 		m_VSAPI->freeMap(argument_map);
 		m_VSAPI->freeMap(result_map);
+		return output;
 	}
 
-	void ShufflePlanes(VSCore* core, VSNode* &node) {
+	VSNode* ShufflePlanes(VSCore* core, VSNode* &node) {
 		VSMap* argument_map = m_VSAPI->createMap();
 		VSPlugin* std_plugin = m_VSAPI->getPluginByID("com.vapoursynth.std", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clips", node, maReplace);
@@ -327,12 +329,13 @@ private:
 			fprintf(stderr, "%s\n", result_error);
 		}
 
-		node = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
 		m_VSAPI->freeMap(argument_map);
 		m_VSAPI->freeMap(result_map);
+		return output;
 	}
 
-	void Pack(VSCore* core, VSNode* &node) {
+	VSNode* Pack(VSCore* core, VSNode* &node) {
 		VSMap* argument_map = m_VSAPI->createMap();
 		VSPlugin* libp2p_plugin = m_VSAPI->getPluginByID("com.djatom.libp2p", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
@@ -343,12 +346,13 @@ private:
 			fprintf(stderr, "%s\n", result_error);
 		}
 
-		node = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
 		m_VSAPI->freeMap(argument_map);
 		m_VSAPI->freeMap(result_map);
+		return output;
 	}
 
-	const VSNode* IVTCDN(VSCore* core, VSNode* node) {
+	VSNode* IVTCDN(VSCore* core, VSNode* node) {
 		VSMap* argument_map = m_VSAPI->createMap();
 		VSPlugin* ivtcdn_plugin = m_VSAPI->getPluginByID("tools.mike.ivtc", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
@@ -363,7 +367,7 @@ private:
 			fprintf(stderr, "%s\n", result_error);
 		}
 
-		const VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
 		m_VSAPI->freeMap(argument_map);
 		m_VSAPI->freeMap(result_map);
 		return output;
@@ -523,14 +527,14 @@ private:
 		if (vi->format.colorFamily == cfYUV) {
 			// Convert to RGB & pack
 			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
-			ConvertToRGB(core, m_FieldsNode);
-			Resize(core, m_FieldsNode, 400, 300);
-			ShufflePlanes(core, m_FieldsNode);
-			Pack(core, m_FieldsNode);
+			m_FieldsNode = ConvertToRGB(core, m_FieldsNode);
+			m_FieldsNode = Resize(core, m_FieldsNode, 400, 300);
+			m_FieldsNode = ShufflePlanes(core, m_FieldsNode);
+			m_FieldsNode = Pack(core, m_FieldsNode);
 		} else if (vi->format.colorFamily == cfRGB) {
 			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
-			ShufflePlanes(core, m_FieldsNode);
-			Pack(core, m_FieldsNode);
+			m_FieldsNode = ShufflePlanes(core, m_FieldsNode);
+			m_FieldsNode = Pack(core, m_FieldsNode);
 		} else {
 			// Hope for the best?
 		}
@@ -564,16 +568,15 @@ private:
 			//m_VSAPI->freeNode(m_FramesNode);
 		}
 
-		m_FramesNode = m_RawFieldsNode;
 		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_RawFieldsNode);
 		if (vi->format.colorFamily == cfYUV) {
 			// Convert to RGB & pack
 			VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
-			IVTCDN(core, m_FramesNode);
-			ConvertToRGB(core, m_FramesNode);
-			Resize(core, m_FramesNode, 600, 450);
-			ShufflePlanes(core, m_FramesNode);
-			Pack(core, m_FramesNode);
+			m_FramesNode = IVTCDN(core, m_RawFieldsNode);
+			m_FramesNode = ConvertToRGB(core, m_FramesNode);
+			m_FramesNode = Resize(core, m_FramesNode, 600, 450);
+			m_FramesNode = ShufflePlanes(core, m_FramesNode);
+			m_FramesNode = Pack(core, m_FramesNode);
 		} else if (vi->format.colorFamily == cfRGB) {
 			// TODO
 		} else {
