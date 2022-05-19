@@ -352,8 +352,9 @@ private:
 		VSPlugin* ivtcdn_plugin = m_VSAPI->getPluginByID("tools.mike.ivtc", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
 		std::string rawProps = m_JsonProps.dump();
-		m_VSAPI->mapSetData(argument_map, "projectfile", rawProps.c_str(), rawProps.size(), dtUtf8, maReplace);
-		m_VSAPI->mapSetInt(argument_map, "rawproject", 1, maReplace);
+		m_VSAPI->mapSetData(argument_map, "projectfile", m_JsonFile, strlen(m_JsonFile), dtUtf8, maReplace);
+		//m_VSAPI->mapSetData(argument_map, "projectfile", rawProps.c_str(), rawProps.size(), dtUtf8, maReplace);
+		//m_VSAPI->mapSetInt(argument_map, "rawproject", 1, maReplace);
 		VSMap* result_map = m_VSAPI->invoke(ivtcdn_plugin, "IVTC", argument_map);
 
 		const char* result_error = m_VSAPI->mapGetError(result_map);
