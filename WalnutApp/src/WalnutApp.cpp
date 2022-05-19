@@ -203,51 +203,6 @@ public:
 		//set_active_frames(R"(A:\Subs\todo\otaku no video\01\walnut\output.vpy)");
 	}
 
-//	void set_active_frames(const char* file) {
-//		if (m_FramesScriptEnvironment != nullptr) {
-//			m_VSAPI->freeNode(m_FramesNode);
-//			m_VSSAPI->freeScript(m_FramesScriptEnvironment);
-//		}
-//		m_FramesScriptEnvironment = m_VSSAPI->createScript(nullptr);
-//
-//		m_VSSAPI->evalSetWorkingDir(m_FramesScriptEnvironment, 1);
-//		int error = m_VSSAPI->evaluateFile(m_FramesScriptEnvironment, file);
-//		if (error != 0) {
-//			fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FramesScriptEnvironment));
-//		}
-//
-//		m_FramesNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
-//		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_FramesNode);
-//		if (vi->format.colorFamily == cfYUV) {
-//			// Convert to RGB & pack
-//			VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
-//			ConvertToRGB(core, m_FramesNode);
-//			ShufflePlanes(core, m_FramesNode);
-//			Pack(core, m_FramesNode);
-//		} else if (vi->format.colorFamily == cfRGB) {
-//			VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
-//			ShufflePlanes(core, m_FramesNode);
-//			Pack(core, m_FramesNode);
-//		} else {
-//			// Hope for the best?
-//		}
-//		fprintf(stderr, "Video Width: %d x %d\n", vi->width, vi->height);
-//		fprintf(stderr, "Video Format: %d, %d, %d\n", vi->format.colorFamily, vi->format.bitsPerSample, vi->format.numPlanes);
-//		m_FramesWidth = vi->width;
-//		m_FramesHeight = vi->height;
-//		m_FramesFrameCount = vi->numFrames;
-//
-//		for (int i = 0; i < 4; i++) {
-//			m_Frames[i] = std::make_shared<Walnut::Image>(
-//				m_FramesWidth,
-//				m_FramesHeight,
-//				Walnut::ImageFormat::RGBA,
-//				nullptr);
-//		}
-//		m_ActiveFile = file;
-//		m_NeedNewFields = true;
-//	}
-
 private:
 	ImFont* m_UbuntuMonoFont = nullptr;
 
@@ -269,8 +224,6 @@ private:
 	std::shared_ptr<Walnut::Image> m_Fields[11];
 
 	// Frames
-	VSScript* m_FramesScriptEnvironment = nullptr;
-	VSNode* m_RawFieldsNode = nullptr;
 	VSNode* m_FramesNode = nullptr;
 	int m_FramesWidth = 0;
 	int m_FramesHeight = 0;
@@ -458,8 +411,6 @@ private:
 	}
 
 	void SaveJson() {
-		//std::ofstream props_file(m_JsonFile);
-		//props_file << m_JsonProps;
 		std::string input = m_JsonProps.dump();
 		std::string compressed = gzip::compress(input.c_str(), input.size());
 		std::ofstream output(m_JsonFile, std::ios::binary);
@@ -554,26 +505,16 @@ private:
 		load_frames();
 	}
 	void load_frames() {
-		if (m_FramesScriptEnvironment == nullptr) {
-			m_FramesScriptEnvironment = m_VSSAPI->createScript(nullptr);
-
-			m_VSSAPI->evalSetWorkingDir(m_FramesScriptEnvironment, 1);
-			int error = m_VSSAPI->evaluateFile(m_FramesScriptEnvironment, m_ActiveFile);
-			if (error != 0) {
-				fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FramesScriptEnvironment));
-			}
-			//m_RawFieldsNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
-		} else {
-			//m_VSSAPI->freeScript(m_FramesScriptEnvironment);
+		if (m_FramesNode != nullptr) {
 			m_VSAPI->freeNode(m_FramesNode);
 		}
-		m_RawFieldsNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
+		VSNode* rawFieldsNode = m_VSSAPI->getOutputNode(m_FieldsScriptEnvironment, 0);
 
-		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_RawFieldsNode);
+		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(rawFieldsNode);
 		if (vi->format.colorFamily == cfYUV) {
 			// Convert to RGB & pack
-			VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
-			m_FramesNode = IVTCDN(core, m_RawFieldsNode);
+			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
+			m_FramesNode = IVTCDN(core, rawFieldsNode);
 			m_FramesNode = ConvertToRGB(core, m_FramesNode);
 			m_FramesNode = Resize(core, m_FramesNode, 600, 450);
 			m_FramesNode = ShufflePlanes(core, m_FramesNode);
@@ -599,51 +540,6 @@ private:
 
 		m_NeedNewFields = true;
 	}
-
-	//void load_frames() {
-	//	if (m_FramesScriptEnvironment != nullptr) {
-	//		m_VSAPI->freeNode(m_FramesNode);
-	//		m_VSSAPI->freeScript(m_FramesScriptEnvironment);
-	//	}
-	//	m_FramesScriptEnvironment = m_VSSAPI->createScript(nullptr);
-
-	//	m_VSSAPI->evalSetWorkingDir(m_FramesScriptEnvironment, 1);
-	//	int error = m_VSSAPI->evaluateFile(m_FramesScriptEnvironment, m_ActiveFile);
-	//	if (error != 0) {
-	//		fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FramesScriptEnvironment));
-	//	}
-
-	//	m_RawFieldsNode = m_FramesNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
-	//	const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_RawFieldsNode);
-	//	if (vi->format.colorFamily == cfYUV) {
-	//		// Convert to RGB & pack
-	//		VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
-	//		IVTCDN(core, m_FramesNode);
-	//		ConvertToRGB(core, m_FramesNode);
-	//		Resize(core, m_FramesNode, 600, 450);
-	//		ShufflePlanes(core, m_FramesNode);
-	//		Pack(core, m_FramesNode);
-	//	} else if (vi->format.colorFamily == cfRGB) {
-	//		// TODO
-	//	} else {
-	//		// Hope for the best?
-	//	}
-
-	//	vi = m_VSAPI->getVideoInfo(m_FramesNode);
-	//	m_FramesWidth = vi->width;
-	//	m_FramesHeight = vi->height;
-	//	m_FramesFrameCount = vi->numFrames;
-
-	//	for (int i = 0; i < 4; i++) {
-	//		m_Frames[i] = std::make_shared<Walnut::Image>(
-	//			m_FramesWidth,
-	//			m_FramesHeight,
-	//			Walnut::ImageFormat::RGBA,
-	//			nullptr);
-	//	}
-
-	//	m_NeedNewFields = true;
-	//}
 };
 
 std::shared_ptr<ExampleLayer> g_Layer = nullptr;
