@@ -77,8 +77,8 @@ public:
 
 		if (ImGui::IsKeyPressed(ImGuiKey_R)) {
 			//set_active_frames(m_ActiveFile);
-			//set_active_fields(m_ActiveFile);
-			load_frames();
+			set_active_fields(m_ActiveFile);
+			//load_frames();
 		}
 
 		if (ImGui::IsKeyPressed(ImGuiKey_T)) {
@@ -129,7 +129,6 @@ public:
 			}
 		}
 
-		m_NeedNewFields = false;
 		for (int i = 0; i < 4; i++) {
 			ImGui::Image(m_Frames[i]->GetDescriptorSet(), { (float)m_FramesWidth, (float)m_FramesHeight });
 			if (ImGui::IsItemHovered()) {
@@ -167,6 +166,8 @@ public:
 		if (ImGui::IsKeyPressed(ImGuiKey_W)) {
 			SaveJson();
 		}
+
+		m_NeedNewFields = false;
 	}
 
 	ExampleLayer() {
@@ -262,14 +263,14 @@ private:
 	// Fields
 	VSScript* m_FieldsScriptEnvironment = nullptr;
 	VSNode* m_FieldsNode = nullptr;
-	VSNode* m_RawFieldsNode = nullptr;
 	int m_FieldsWidth = 0;
 	int m_FieldsHeight = 0;
 	int m_FieldsFrameCount = 0;
 	std::shared_ptr<Walnut::Image> m_Fields[11];
 
 	// Frames
-	//VSScript* m_FramesScriptEnvironment = nullptr;
+	VSScript* m_FramesScriptEnvironment = nullptr;
+	VSNode* m_RawFieldsNode = nullptr;
 	VSNode* m_FramesNode = nullptr;
 	int m_FramesWidth = 0;
 	int m_FramesHeight = 0;
@@ -347,14 +348,14 @@ private:
 		m_VSAPI->freeMap(result_map);
 	}
 
-	void IVTCDN(VSCore* core, VSNode*& node) {
+	const VSNode* IVTCDN(VSCore* core, VSNode* node) {
 		VSMap* argument_map = m_VSAPI->createMap();
 		VSPlugin* ivtcdn_plugin = m_VSAPI->getPluginByID("tools.mike.ivtc", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
 		std::string rawProps = m_JsonProps.dump();
-		m_VSAPI->mapSetData(argument_map, "projectfile", m_JsonFile, strlen(m_JsonFile), dtUtf8, maReplace);
-		//m_VSAPI->mapSetData(argument_map, "projectfile", rawProps.c_str(), rawProps.size(), dtUtf8, maReplace);
-		//m_VSAPI->mapSetInt(argument_map, "rawproject", 1, maReplace);
+		//m_VSAPI->mapSetData(argument_map, "projectfile", m_JsonFile, strlen(m_JsonFile), dtUtf8, maReplace);
+		m_VSAPI->mapSetData(argument_map, "projectfile", rawProps.c_str(), rawProps.size(), dtUtf8, maReplace);
+		m_VSAPI->mapSetInt(argument_map, "rawproject", 1, maReplace);
 		VSMap* result_map = m_VSAPI->invoke(ivtcdn_plugin, "IVTC", argument_map);
 
 		const char* result_error = m_VSAPI->mapGetError(result_map);
@@ -362,9 +363,10 @@ private:
 			fprintf(stderr, "%s\n", result_error);
 		}
 
-		node = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		const VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
 		m_VSAPI->freeMap(argument_map);
 		m_VSAPI->freeMap(result_map);
+		return output;
 	}
 
 	void DrawField(int i) {
@@ -502,6 +504,8 @@ private:
 	}
 
 	void set_active_fields(const char* file) {
+		m_ActiveFile = file;
+
 		if (m_FieldsScriptEnvironment != nullptr) {
 			m_VSAPI->freeNode(m_FieldsNode);
 			m_VSSAPI->freeScript(m_FieldsScriptEnvironment);
@@ -514,7 +518,7 @@ private:
 			fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FieldsScriptEnvironment));
 		}
 
-		m_RawFieldsNode = m_FieldsNode = m_VSSAPI->getOutputNode(m_FieldsScriptEnvironment, 0);
+		m_FieldsNode = m_VSSAPI->getOutputNode(m_FieldsScriptEnvironment, 0);
 		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_FieldsNode);
 		if (vi->format.colorFamily == cfYUV) {
 			// Convert to RGB & pack
@@ -544,19 +548,27 @@ private:
 		}
 
 		load_frames();
-
-		m_ActiveFile = file;
 	}
-
 	void load_frames() {
-		if (m_FramesNode != nullptr) {
-			m_VSAPI->freeNode(m_FramesNode);
+		if (m_FramesScriptEnvironment == nullptr) {
+			m_FramesScriptEnvironment = m_VSSAPI->createScript(nullptr);
+
+			m_VSSAPI->evalSetWorkingDir(m_FramesScriptEnvironment, 1);
+			int error = m_VSSAPI->evaluateFile(m_FramesScriptEnvironment, m_ActiveFile);
+			if (error != 0) {
+				fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FramesScriptEnvironment));
+			}
+			m_RawFieldsNode = m_FramesNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
+		} else {
+			//m_VSSAPI->freeScript(m_FramesScriptEnvironment);
+			//m_VSAPI->freeNode(m_FramesNode);
 		}
+
 		m_FramesNode = m_RawFieldsNode;
 		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_RawFieldsNode);
 		if (vi->format.colorFamily == cfYUV) {
 			// Convert to RGB & pack
-			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
+			VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
 			IVTCDN(core, m_FramesNode);
 			ConvertToRGB(core, m_FramesNode);
 			Resize(core, m_FramesNode, 600, 450);
@@ -583,6 +595,51 @@ private:
 
 		m_NeedNewFields = true;
 	}
+
+	//void load_frames() {
+	//	if (m_FramesScriptEnvironment != nullptr) {
+	//		m_VSAPI->freeNode(m_FramesNode);
+	//		m_VSSAPI->freeScript(m_FramesScriptEnvironment);
+	//	}
+	//	m_FramesScriptEnvironment = m_VSSAPI->createScript(nullptr);
+
+	//	m_VSSAPI->evalSetWorkingDir(m_FramesScriptEnvironment, 1);
+	//	int error = m_VSSAPI->evaluateFile(m_FramesScriptEnvironment, m_ActiveFile);
+	//	if (error != 0) {
+	//		fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FramesScriptEnvironment));
+	//	}
+
+	//	m_RawFieldsNode = m_FramesNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
+	//	const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_RawFieldsNode);
+	//	if (vi->format.colorFamily == cfYUV) {
+	//		// Convert to RGB & pack
+	//		VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
+	//		IVTCDN(core, m_FramesNode);
+	//		ConvertToRGB(core, m_FramesNode);
+	//		Resize(core, m_FramesNode, 600, 450);
+	//		ShufflePlanes(core, m_FramesNode);
+	//		Pack(core, m_FramesNode);
+	//	} else if (vi->format.colorFamily == cfRGB) {
+	//		// TODO
+	//	} else {
+	//		// Hope for the best?
+	//	}
+
+	//	vi = m_VSAPI->getVideoInfo(m_FramesNode);
+	//	m_FramesWidth = vi->width;
+	//	m_FramesHeight = vi->height;
+	//	m_FramesFrameCount = vi->numFrames;
+
+	//	for (int i = 0; i < 4; i++) {
+	//		m_Frames[i] = std::make_shared<Walnut::Image>(
+	//			m_FramesWidth,
+	//			m_FramesHeight,
+	//			Walnut::ImageFormat::RGBA,
+	//			nullptr);
+	//	}
+
+	//	m_NeedNewFields = true;
+	//}
 };
 
 std::shared_ptr<ExampleLayer> g_Layer = nullptr;
