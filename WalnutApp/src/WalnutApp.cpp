@@ -562,8 +562,10 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 	{
 		if (ImGui::BeginMenu("File"))
 		{
-			if (ImGui::MenuItem("Exit"))
-			{
+			if (ImGui::MenuItem("New Project")) {
+				ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".vpy", ".");
+			}
+			if (ImGui::MenuItem("Exit")) {
 				app->Close();
 			}
 			ImGui::EndMenu();
