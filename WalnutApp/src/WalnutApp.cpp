@@ -10,6 +10,8 @@
 #include <format>
 #include <fstream>
 #include <iostream>
+#include "gzip/compress.hpp"
+#include "gzip/decompress.hpp"
 
 using nlohmann::json;
 
@@ -30,7 +32,7 @@ static void HelpMarker(const char* desc)
 	}
 }
 
-static ImU32 ColorForAction(std::string& action) {
+static ImU32 ColorForAction(const std::string& action) {
 	static const std::map<std::string, ImU32> map = {
 		{"Top Frame 0", IM_COL32(178, 34, 34, 200)},
 		{"Bottom Frame 0", IM_COL32(178, 34, 34, 200)},
@@ -56,126 +58,6 @@ public:
 		io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
 	}
 
-	void DrawField(int i) {
-		int active_field = m_ActiveCycle * 10 + i;
-		json &field_props = m_JsonProps["frame_props"][active_field];
-		ImVec2 pos = ImGui::GetCursorScreenPos();
-		ImGui::Image(m_Fields[i]->GetDescriptorSet(), { (float)m_FieldsWidth, (float)m_FieldsHeight });
-		if (ImGui::IsItemHovered()) {
-			if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-				if (field_props["IVTC_DN_NEW_SCENE"] == 0) {
-					field_props["IVTC_DN_NEW_SCENE"] = 1;
-				} else {
-					field_props["IVTC_DN_NEW_SCENE"] = 0;
-				}
-			}
-
-			if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-				field_props["IVTC_DN_NOTE"] = "A";
-			} else if (ImGui::IsKeyPressed(ImGuiKey_B)) {
-				field_props["IVTC_DN_NOTE"] = "B";
-			} else if (ImGui::IsKeyPressed(ImGuiKey_C)) {
-				field_props["IVTC_DN_NOTE"] = "C";
-			} else if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-				field_props["IVTC_DN_NOTE"] = "D";
-			}
-
-			const char* top_or_bottom = i % 2 ? "Bottom" : "Top";
-			if (ImGui::IsKeyPressed(ImGuiKey_1) && i < 11) {
-				std::string action = std::format("{} Frame 0", top_or_bottom);
-				if (field_props["IVTC_DN_ACTION"] == action) {
-					action = "Drop";
-				}
-				field_props["IVTC_DN_ACTION"] = action;
-			} else if (ImGui::IsKeyPressed(ImGuiKey_2) && i < 11) {
-				std::string action = std::format("{} Frame 1", top_or_bottom);
-				if (field_props["IVTC_DN_ACTION"] == action) {
-					action = "Drop";
-				}
-				field_props["IVTC_DN_ACTION"] = action;
-			} else if (ImGui::IsKeyPressed(ImGuiKey_3) && i < 11) {
-				std::string action = std::format("{} Frame 2", top_or_bottom);
-				if (field_props["IVTC_DN_ACTION"] == action) {
-					action = "Drop";
-				}
-				field_props["IVTC_DN_ACTION"] = action;
-			} else if (ImGui::IsKeyPressed(ImGuiKey_4)) {
-				std::string action;
-				if (i < 10) {
-					action = std::format("{} Frame 3", top_or_bottom);
-				} else {
-					action = "Complete Previous Cycle";
-				}
-				if (field_props["IVTC_DN_ACTION"] == action) {
-					action = "Drop";
-				}
-				field_props["IVTC_DN_ACTION"] = action;
-				std::cerr << "Field " << i << " Action: " << action;
-			}
-			ImGui::BeginTooltip();
-			ImGui::Text("Field %d", i);
-			ImGui::EndTooltip();
-		}
-		std::string note = field_props["IVTC_DN_NOTE"];
-		std::string action = field_props["IVTC_DN_ACTION"];
-
-		if (field_props["IVTC_DN_NEW_SCENE"] != 0) {
-			ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x - 5, pos.y), ImVec2(pos.x, pos.y + 300), IM_COL32(255, 128, 0, 255));
-		}
-		ImVec2 text_pos(pos.x + 184, pos.y + 118);
-		ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(text_pos.x - 4, text_pos.y + 5), ImVec2(text_pos.x + 40, text_pos.y + 60), ColorForAction(action));
-		ImGui::GetWindowDrawList()->AddText(m_UbuntuMonoFont, 64.0f, text_pos, IM_COL32_WHITE, note.c_str());
-		std::string id = std::format("field{}", i);
-		ImGui::PushID(id.c_str());
-		if (ImGui::BeginPopupContextItem(id.c_str())) {
-			ImGui::Text("This a popup for field %d!", i);
-			ImGui::EndPopup();
-		}
-		if (i != 10) {
-			ImGui::SameLine();
-		}
-		ImGui::PopID();
-	}
-
-	void SaveJson() {
-		std::ofstream props_file("A:\\Subs\\todo\\flcl\\01\\walnut\\props.json");
-		props_file << m_JsonProps;
-	}
-
-	void ApplyCycleToScene() {
-		json &props = m_JsonProps["frame_props"];
-		int start_of_scene = m_ActiveCycle * 10;
-		while (start_of_scene > 0 && props[start_of_scene]["IVTC_DN_NEW_SCENE"] != 1) {
-			--start_of_scene;
-		}
-		int end_of_scene = start_of_scene + 1;
-		while (end_of_scene < m_FieldsFrameCount && props[end_of_scene]["IVTC_DN_NEW_SCENE"] != 1) {
-			++end_of_scene;
-		}
-		std::cerr << "Scene [" << start_of_scene << ", " << end_of_scene << "]" << std::endl;
-
-		// TODO need to think about cycles a lot
-		int start_of_cycle = m_ActiveCycle * 10;
-		int end_of_cycle = start_of_cycle + 9;
-		std::cerr << "Cycle [" << start_of_cycle << ", " << end_of_cycle << "]" << std::endl;
-		std::string cycle_actions[10];
-		std::string cycle_notes[10];
-		int position_in_cycle = 0;
-		for (int i = start_of_cycle; i <= end_of_cycle; i++) {
-			cycle_actions[position_in_cycle] = props[i]["IVTC_DN_ACTION"];
-			cycle_notes[position_in_cycle] = props[i]["IVTC_DN_NOTE"];
-			++position_in_cycle;
-		}
-
-		// TODO need to think about cycles a lot
-		position_in_cycle = start_of_scene % 10;
-		for (int i = start_of_scene; i < end_of_scene; i++) {
-			props[i]["IVTC_DN_ACTION"] = cycle_actions[position_in_cycle];
-			props[i]["IVTC_DN_NOTE"] = cycle_notes[position_in_cycle];
-			++position_in_cycle %= 10;
-		}
-	}
-
 	virtual void OnUIRender() override {
 		static int error = 0;
 		static char error_message[1024];
@@ -194,7 +76,9 @@ public:
 		}
 
 		if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-			set_active_frames(m_ActiveFile);
+			//set_active_frames(m_ActiveFile);
+			//set_active_fields(m_ActiveFile);
+			load_frames();
 		}
 
 		if (ImGui::IsKeyPressed(ImGuiKey_T)) {
@@ -240,10 +124,32 @@ public:
 				const uint8_t* frame_ptr = m_VSAPI->getReadPtr(frame, 0);
 				m_Frames[i]->SetData(frame_ptr);
 				m_VSAPI->freeFrame(frame);
+			} else {
+				// Sleep for vsync? minimized window uses 100% of 1 CPU core since this is a busy wait without any actions
 			}
 		}
+
+		m_NeedNewFields = false;
 		for (int i = 0; i < 4; i++) {
 			ImGui::Image(m_Frames[i]->GetDescriptorSet(), { (float)m_FramesWidth, (float)m_FramesHeight });
+			if (ImGui::IsItemHovered()) {
+				auto activeFrame = std::to_string(m_ActiveCycle * 4 + i);
+				if (ImGui::IsKeyPressed(ImGuiKey_N)) {
+					auto& no_match_handling = m_JsonProps["no_match_handling"];
+					if (no_match_handling.contains(activeFrame)) {
+						no_match_handling.erase(activeFrame);
+					} else {
+						no_match_handling[activeFrame] = "Next";
+					}
+				}
+
+				ImGui::BeginTooltip();
+				ImGui::Text("Frame %d", i);
+				ImGui::EndTooltip();
+			}
+			std::string id = std::format("frame{}", i);
+			//ImGui::PushID(id.c_str());
+			//ImGui::PopID();
 			if (i < 4) {
 				ImGui::SameLine();
 			}
@@ -276,89 +182,70 @@ public:
 		m_VSAPI = m_VSSAPI->getVSAPI(VAPOURSYNTH_API_VERSION);
 		assert(m_VSAPI);
 
-		std::ifstream props_file("A:\\Subs\\todo\\flcl\\01\\walnut\\props.json");
-		props_file >> m_JsonProps;
-		fprintf(stderr, "%zd Frame Props loaded\n", m_JsonProps["frame_props"].size());
+		//std::ifstream props_file("A:\\Subs\\todo\\flcl\\01\\walnut\\props_v2.json");
+		//std::ifstream props_file(m_JsonFile);
+		//props_file >> m_JsonProps;
+		std::ifstream input(m_JsonFile, std::ios::binary | std::ios::ate);
+		int inputSize = input.tellg();
+		input.seekg(0, std::ios::beg);
+
+		std::vector<char> compressed;
+		compressed.resize(inputSize);
+		input.read(compressed.data(), inputSize);
+		std::string decompressed = gzip::decompress(compressed.data(), inputSize);
+		m_JsonProps = json::parse(decompressed);
+
 		//set_active_fields("A:\\Subs\\todo\\flcl\\01\\walnut\\separate_fields.vpy");
 		//set_active_fields("A:\\Subs\\todo\\garzey\\01\\line doubling\\separate fields.vpy");
-		set_active_fields("A:\\Subs\\todo\\otaku no video\\01\\walnut\\fields.vpy");
-		set_active_frames("A:\\Subs\\todo\\flcl\\01\\walnut\\output frames.vpy");
+		set_active_fields(R"(A:\Subs\todo\otaku no video\01\walnut\fields.vpy)");
+		//set_active_frames("A:\\Subs\\todo\\flcl\\01\\walnut\\output frames.vpy");
+		//set_active_frames(R"(A:\Subs\todo\otaku no video\01\walnut\output.vpy)");
 	}
 
-	void set_active_fields(const char* file) {
-		if (m_FieldsScriptEnvironment != nullptr) {
-			m_VSAPI->freeNode(m_FieldsNode);
-			m_VSSAPI->freeScript(m_FieldsScriptEnvironment);
-		}
-		m_FieldsScriptEnvironment = m_VSSAPI->createScript(nullptr);
-
-		m_VSSAPI->evalSetWorkingDir(m_FieldsScriptEnvironment, 1);
-		int error = m_VSSAPI->evaluateFile(m_FieldsScriptEnvironment, file);
-		if (error != 0) {
-			fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FieldsScriptEnvironment));
-		}
-
-		m_FieldsNode = m_VSSAPI->getOutputNode(m_FieldsScriptEnvironment, 0);
-		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_FieldsNode);
-		if (vi->format.colorFamily == cfYUV) {
-			// Convert to RGB & pack
-			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
-			ConvertToRGB(core, m_FieldsNode);
-			ShufflePlanes(core, m_FieldsNode);
-			Pack(core, m_FieldsNode);
-		} else if (vi->format.colorFamily == cfRGB) {
-			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
-			ShufflePlanes(core, m_FieldsNode);
-			Pack(core, m_FieldsNode);
-		} else {
-			// Hope for the best?
-		}
-		fprintf(stderr, "Video Width: %d x %d\n", vi->width, vi->height);
-		fprintf(stderr, "Video Format: %d, %d, %d\n", vi->format.colorFamily, vi->format.bitsPerSample, vi->format.numPlanes);
-		m_FieldsWidth = vi->width;
-		m_FieldsHeight = vi->height;
-		m_FieldsFrameCount = vi->numFrames;
-
-		for (int i = 0; i < 11; i++) {
-			m_Fields[i] = std::make_shared<Walnut::Image>(
-				m_FieldsWidth,
-				m_FieldsHeight,
-				Walnut::ImageFormat::RGBA,
-				nullptr);
-		}
-	}
-
-	void set_active_frames(const char* file) {
-		if (m_FramesScriptEnvironment != nullptr) {
-			m_VSAPI->freeNode(m_FramesNode);
-			m_VSSAPI->freeScript(m_FramesScriptEnvironment);
-		}
-		m_FramesScriptEnvironment = m_VSSAPI->createScript(nullptr);
-
-		int error = m_VSSAPI->evaluateFile(m_FramesScriptEnvironment, file);
-		if (error != 0) {
-			fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FramesScriptEnvironment));
-		}
-
-		m_FramesNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
-		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_FramesNode);
-		fprintf(stderr, "Video Width: %d x %d\n", vi->width, vi->height);
-		fprintf(stderr, "Video Format: %d, %d, %d\n", vi->format.colorFamily, vi->format.bitsPerSample, vi->format.numPlanes);
-		m_FramesWidth = vi->width;
-		m_FramesHeight = vi->height;
-		m_FramesFrameCount = vi->numFrames;
-
-		for (int i = 0; i < 4; i++) {
-			m_Frames[i] = std::make_shared<Walnut::Image>(
-				m_FramesWidth,
-				m_FramesHeight,
-				Walnut::ImageFormat::RGBA,
-				nullptr);
-		}
-		m_ActiveFile = file;
-		m_NeedNewFields = true;
-	}
-
+//	void set_active_frames(const char* file) {
+//		if (m_FramesScriptEnvironment != nullptr) {
+//			m_VSAPI->freeNode(m_FramesNode);
+//			m_VSSAPI->freeScript(m_FramesScriptEnvironment);
+//		}
+//		m_FramesScriptEnvironment = m_VSSAPI->createScript(nullptr);
+//
+//		m_VSSAPI->evalSetWorkingDir(m_FramesScriptEnvironment, 1);
+//		int error = m_VSSAPI->evaluateFile(m_FramesScriptEnvironment, file);
+//		if (error != 0) {
+//			fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FramesScriptEnvironment));
+//		}
+//
+//		m_FramesNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
+//		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_FramesNode);
+//		if (vi->format.colorFamily == cfYUV) {
+//			// Convert to RGB & pack
+//			VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
+//			ConvertToRGB(core, m_FramesNode);
+//			ShufflePlanes(core, m_FramesNode);
+//			Pack(core, m_FramesNode);
+//		} else if (vi->format.colorFamily == cfRGB) {
+//			VSCore* core = m_VSSAPI->getCore(m_FramesScriptEnvironment);
+//			ShufflePlanes(core, m_FramesNode);
+//			Pack(core, m_FramesNode);
+//		} else {
+//			// Hope for the best?
+//		}
+//		fprintf(stderr, "Video Width: %d x %d\n", vi->width, vi->height);
+//		fprintf(stderr, "Video Format: %d, %d, %d\n", vi->format.colorFamily, vi->format.bitsPerSample, vi->format.numPlanes);
+//		m_FramesWidth = vi->width;
+//		m_FramesHeight = vi->height;
+//		m_FramesFrameCount = vi->numFrames;
+//
+//		for (int i = 0; i < 4; i++) {
+//			m_Frames[i] = std::make_shared<Walnut::Image>(
+//				m_FramesWidth,
+//				m_FramesHeight,
+//				Walnut::ImageFormat::RGBA,
+//				nullptr);
+//		}
+//		m_ActiveFile = file;
+//		m_NeedNewFields = true;
+//	}
 
 private:
 	ImFont* m_UbuntuMonoFont = nullptr;
@@ -366,6 +253,7 @@ private:
 	const VSAPI* m_VSAPI = nullptr;
 	const VSSCRIPTAPI* m_VSSAPI = nullptr;
 	const char* m_ActiveFile; // TODO
+	const char* m_JsonFile = R"(A:\Subs\todo\otaku no video\01\walnut\props.ivtc)";
 	json m_JsonProps;
 
 	int m_ActiveCycle = 1316;
@@ -374,18 +262,37 @@ private:
 	// Fields
 	VSScript* m_FieldsScriptEnvironment = nullptr;
 	VSNode* m_FieldsNode = nullptr;
+	VSNode* m_RawFieldsNode = nullptr;
 	int m_FieldsWidth = 0;
 	int m_FieldsHeight = 0;
 	int m_FieldsFrameCount = 0;
 	std::shared_ptr<Walnut::Image> m_Fields[11];
 
 	// Frames
-	VSScript* m_FramesScriptEnvironment = nullptr;
+	//VSScript* m_FramesScriptEnvironment = nullptr;
 	VSNode* m_FramesNode = nullptr;
 	int m_FramesWidth = 0;
 	int m_FramesHeight = 0;
 	int m_FramesFrameCount = 0;
 	std::shared_ptr<Walnut::Image> m_Frames[4];
+
+	void Resize(VSCore* core, VSNode* &node, int64_t width, int64_t height) {
+		VSMap* argument_map = m_VSAPI->createMap();
+		VSPlugin* resize_plugin = m_VSAPI->getPluginByID("com.vapoursynth.resize", core);
+		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
+		m_VSAPI->mapSetInt(argument_map, "width", width, maReplace);
+		m_VSAPI->mapSetInt(argument_map, "height", height, maReplace);
+		VSMap* result_map = m_VSAPI->invoke(resize_plugin, "Spline36", argument_map);
+
+		const char* result_error = m_VSAPI->mapGetError(result_map);
+		if (result_error) {
+			fprintf(stderr, "%s\n", result_error);
+		}
+
+		node = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		m_VSAPI->freeMap(argument_map);
+		m_VSAPI->freeMap(result_map);
+	}
 
 	void ConvertToRGB(VSCore* core, VSNode* &node) {
 		VSMap* argument_map = m_VSAPI->createMap();
@@ -439,13 +346,248 @@ private:
 		m_VSAPI->freeMap(argument_map);
 		m_VSAPI->freeMap(result_map);
 	}
+
+	void IVTCDN(VSCore* core, VSNode*& node) {
+		VSMap* argument_map = m_VSAPI->createMap();
+		VSPlugin* ivtcdn_plugin = m_VSAPI->getPluginByID("tools.mike.ivtc", core);
+		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
+		std::string rawProps = m_JsonProps.dump();
+		m_VSAPI->mapSetData(argument_map, "projectfile", rawProps.c_str(), rawProps.size(), dtUtf8, maReplace);
+		m_VSAPI->mapSetInt(argument_map, "rawproject", 1, maReplace);
+		VSMap* result_map = m_VSAPI->invoke(ivtcdn_plugin, "IVTC", argument_map);
+
+		const char* result_error = m_VSAPI->mapGetError(result_map);
+		if (result_error) {
+			fprintf(stderr, "%s\n", result_error);
+		}
+
+		node = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		m_VSAPI->freeMap(argument_map);
+		m_VSAPI->freeMap(result_map);
+	}
+
+	void DrawField(int i) {
+		int active_field = m_ActiveCycle * 10 + i;
+		ImVec2 pos = ImGui::GetCursorScreenPos();
+		ImGui::Image(m_Fields[i]->GetDescriptorSet(), { (float)m_FieldsWidth, (float)m_FieldsHeight });
+		auto& note = m_JsonProps["notes"][active_field];
+		auto& action = m_JsonProps["ivtc_actions"][active_field];
+		auto& scene_changes = m_JsonProps["scene_changes"];
+		if (ImGui::IsItemHovered()) {
+			if (ImGui::IsKeyPressed(ImGuiKey_S)) {
+				auto it = std::find(scene_changes.begin(), scene_changes.end(), active_field);
+				if (it == scene_changes.end()) {
+					scene_changes.push_back(active_field);
+				} else {
+					scene_changes.erase(it);
+				}
+			}
+
+			if (ImGui::IsKeyPressed(ImGuiKey_A)) {
+				note = "A";
+			} else if (ImGui::IsKeyPressed(ImGuiKey_B)) {
+				note = "B";
+			} else if (ImGui::IsKeyPressed(ImGuiKey_C)) {
+				note = "C";
+			} else if (ImGui::IsKeyPressed(ImGuiKey_D)) {
+				note = "D";
+			}
+
+			const char* top_or_bottom = i % 2 ? "Bottom" : "Top";
+			if (ImGui::IsKeyPressed(ImGuiKey_1) && i < 11) {
+				std::string positive_action = std::format("{} Frame 0", top_or_bottom);
+				if (action == positive_action) {
+					action = "Drop";
+				} else {
+					action = positive_action;
+				}
+			} else if (ImGui::IsKeyPressed(ImGuiKey_2) && i < 11) {
+				std::string positive_action = std::format("{} Frame 1", top_or_bottom);
+				if (action == positive_action) {
+					action = "Drop";
+				} else {
+					action = positive_action;
+				}
+			} else if (ImGui::IsKeyPressed(ImGuiKey_3) && i < 11) {
+				std::string positive_action = std::format("{} Frame 2", top_or_bottom);
+				if (action == positive_action) {
+					action = "Drop";
+				} else {
+					action = positive_action;
+				}
+			} else if (ImGui::IsKeyPressed(ImGuiKey_4)) {
+				std::string positive_action;
+				if (i < 10) {
+					positive_action = std::format("{} Frame 3", top_or_bottom);
+				} else {
+					positive_action = "Complete Previous Cycle";
+				}
+				if (action == positive_action) {
+					action = "Drop";
+				} else {
+					action = positive_action;
+				}
+			}
+			ImGui::BeginTooltip();
+			ImGui::Text("Field %d", i);
+			ImGui::EndTooltip();
+		}
+		if (std::find(scene_changes.begin(), scene_changes.end(), active_field) != scene_changes.end()) {
+			ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x - 5, pos.y), ImVec2(pos.x, pos.y + 300), IM_COL32(255, 128, 0, 255));
+		}
+		ImVec2 text_pos(pos.x + 184, pos.y + 118);
+		ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(text_pos.x - 4, text_pos.y + 5), ImVec2(text_pos.x + 40, text_pos.y + 60), ColorForAction(action.get<std::string>()));
+		ImGui::GetWindowDrawList()->AddText(m_UbuntuMonoFont, 64.0f, text_pos, IM_COL32_WHITE, note.get<std::string>().c_str());
+		std::string id = std::format("field{}", i);
+		ImGui::PushID(id.c_str());
+		if (ImGui::BeginPopupContextItem(id.c_str())) {
+			ImGui::Text("This a popup for field %d!", i);
+			ImGui::EndPopup();
+		}
+		if (i != 10) {
+			ImGui::SameLine();
+		}
+		ImGui::PopID();
+	}
+
+	void SaveJson() {
+		//std::ofstream props_file(m_JsonFile);
+		//props_file << m_JsonProps;
+		std::string input = m_JsonProps.dump();
+		std::string compressed = gzip::compress(input.c_str(), input.size());
+		std::ofstream output(m_JsonFile, std::ios::binary);
+		output << compressed;
+	}
+
+	void ApplyCycleToScene() {
+		auto& notes = m_JsonProps["notes"];
+		auto& actions = m_JsonProps["ivtc_actions"];
+		const auto& scene_changes = m_JsonProps["scene_changes"];
+
+		int start_of_cycle = m_ActiveCycle * 10;
+		int end_of_cycle = start_of_cycle + 9;
+		std::cerr << "Cycle [" << start_of_cycle << ", " << end_of_cycle << "]" << std::endl;
+
+		int start_of_scene = 0;
+		int end_of_scene = m_FieldsFrameCount - 1;
+		for (auto it = scene_changes.begin(); it != scene_changes.end(); it++) {
+			auto val = it.value();
+			if (val > start_of_scene && val < start_of_cycle) {
+				start_of_scene = val;
+			}
+			if (val < end_of_scene && val > start_of_cycle) {
+				end_of_scene = val;
+			}
+		}
+		std::cerr << "Scene [" << start_of_scene << ", " << end_of_scene << "]" << std::endl;
+
+		// TODO need to think about cycles a lot
+		std::string cycle_actions[10];
+		std::string cycle_notes[10];
+		int position_in_cycle = 0;
+		for (int i = start_of_cycle; i <= end_of_cycle; i++) {
+			cycle_actions[position_in_cycle] = actions[i];
+			cycle_notes[position_in_cycle] = notes[i];
+			++position_in_cycle;
+		}
+
+		// TODO need to think about cycles a lot
+		position_in_cycle = start_of_scene % 10;
+		for (int i = start_of_scene; i < end_of_scene; i++) {
+			actions[i] = cycle_actions[position_in_cycle];
+			notes[i] = cycle_notes[position_in_cycle];
+			++position_in_cycle %= 10;
+		}
+	}
+
+	void set_active_fields(const char* file) {
+		if (m_FieldsScriptEnvironment != nullptr) {
+			m_VSAPI->freeNode(m_FieldsNode);
+			m_VSSAPI->freeScript(m_FieldsScriptEnvironment);
+		}
+		m_FieldsScriptEnvironment = m_VSSAPI->createScript(nullptr);
+
+		m_VSSAPI->evalSetWorkingDir(m_FieldsScriptEnvironment, 1);
+		int error = m_VSSAPI->evaluateFile(m_FieldsScriptEnvironment, file);
+		if (error != 0) {
+			fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FieldsScriptEnvironment));
+		}
+
+		m_RawFieldsNode = m_FieldsNode = m_VSSAPI->getOutputNode(m_FieldsScriptEnvironment, 0);
+		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_FieldsNode);
+		if (vi->format.colorFamily == cfYUV) {
+			// Convert to RGB & pack
+			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
+			ConvertToRGB(core, m_FieldsNode);
+			Resize(core, m_FieldsNode, 400, 300);
+			ShufflePlanes(core, m_FieldsNode);
+			Pack(core, m_FieldsNode);
+		} else if (vi->format.colorFamily == cfRGB) {
+			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
+			ShufflePlanes(core, m_FieldsNode);
+			Pack(core, m_FieldsNode);
+		} else {
+			// Hope for the best?
+		}
+		vi = m_VSAPI->getVideoInfo(m_FieldsNode);
+		m_FieldsWidth = vi->width;
+		m_FieldsHeight = vi->height;
+		m_FieldsFrameCount = vi->numFrames;
+
+		for (int i = 0; i < 11; i++) {
+			m_Fields[i] = std::make_shared<Walnut::Image>(
+				m_FieldsWidth,
+				m_FieldsHeight,
+				Walnut::ImageFormat::RGBA,
+				nullptr);
+		}
+
+		load_frames();
+
+		m_ActiveFile = file;
+	}
+
+	void load_frames() {
+		if (m_FramesNode != nullptr) {
+			m_VSAPI->freeNode(m_FramesNode);
+		}
+		m_FramesNode = m_RawFieldsNode;
+		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_RawFieldsNode);
+		if (vi->format.colorFamily == cfYUV) {
+			// Convert to RGB & pack
+			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
+			IVTCDN(core, m_FramesNode);
+			ConvertToRGB(core, m_FramesNode);
+			Resize(core, m_FramesNode, 600, 450);
+			ShufflePlanes(core, m_FramesNode);
+			Pack(core, m_FramesNode);
+		} else if (vi->format.colorFamily == cfRGB) {
+			// TODO
+		} else {
+			// Hope for the best?
+		}
+
+		vi = m_VSAPI->getVideoInfo(m_FramesNode);
+		m_FramesWidth = vi->width;
+		m_FramesHeight = vi->height;
+		m_FramesFrameCount = vi->numFrames;
+
+		for (int i = 0; i < 4; i++) {
+			m_Frames[i] = std::make_shared<Walnut::Image>(
+				m_FramesWidth,
+				m_FramesHeight,
+				Walnut::ImageFormat::RGBA,
+				nullptr);
+		}
+
+		m_NeedNewFields = true;
+	}
 };
 
 std::shared_ptr<ExampleLayer> g_Layer = nullptr;
 
 void glfw_drop_callback(GLFWwindow* window, int path_count, const char* paths[]) {
-	fprintf(stderr, "Path count: %d, First Path: %s\n", path_count, paths[0]);
-	g_Layer->set_active_frames(paths[0]);
+	//g_Layer->set_active_frames(paths[0]);
 	return;
 }
 
