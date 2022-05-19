@@ -562,11 +562,12 @@ private:
 			if (error != 0) {
 				fprintf(stderr, "Error loading file: %s\n", m_VSSAPI->getError(m_FramesScriptEnvironment));
 			}
-			m_RawFieldsNode = m_FramesNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
+			//m_RawFieldsNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
 		} else {
 			//m_VSSAPI->freeScript(m_FramesScriptEnvironment);
-			//m_VSAPI->freeNode(m_FramesNode);
+			m_VSAPI->freeNode(m_FramesNode);
 		}
+		m_RawFieldsNode = m_VSSAPI->getOutputNode(m_FramesScriptEnvironment, 0);
 
 		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_RawFieldsNode);
 		if (vi->format.colorFamily == cfYUV) {
