@@ -10,6 +10,7 @@ bin-int/
 *.sln
 
 *Makefile
+imgui.ini
 
 # Exclude
 !vendor/bin
