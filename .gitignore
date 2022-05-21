@@ -9,7 +9,7 @@ bin-int/
 *.vcxproj.filters
 *.sln
 
-*Makefile
+Makefile
 imgui.ini
 
 # Exclude
