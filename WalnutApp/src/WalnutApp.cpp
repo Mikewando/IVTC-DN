@@ -1,3 +1,5 @@
+#include "p2p.h"
+#include "p2p_api.h"
 #include "gzip/compress.hpp"
 #include "gzip/decompress.hpp"
 #include "ImGuiFileDialog.h"
@@ -125,9 +127,22 @@ public:
 					fprintf(stderr, error_message);
 					error = 1;
 				}
-				const uint8_t* frame_ptr = m_VSAPI->getReadPtr(frame, 0);
-				m_Fields[i]->SetData(frame_ptr);
+				uint8_t* imageBuffer = (uint8_t*)malloc(m_FieldsWidth * m_FieldsHeight * 4);
+				p2p_buffer_param p = {};
+				p.packing = p2p_rgba32_be;
+				p.width = m_FieldsWidth;
+				p.height = m_FieldsHeight;
+				p.dst[0] = imageBuffer;
+				p.dst_stride[0] = m_FieldsWidth * 4;
+				for (int plane = 0; plane < 3; plane++) {
+					p.src[plane] = m_VSAPI->getReadPtr(frame, plane);
+					p.src_stride[plane] = m_VSAPI->getStride(frame, plane);
+				}
+				p2p_pack_frame(&p, P2P_ALPHA_SET_ONE);
+
+				m_Fields[i]->SetData(imageBuffer);
 				m_VSAPI->freeFrame(frame);
+				free(imageBuffer);
 			}
 		}
 
@@ -173,14 +188,26 @@ public:
 					fprintf(stderr, error_message);
 					error = 1;
 				}
+				uint8_t* imageBuffer = (uint8_t*)malloc(m_FramesWidth * m_FramesHeight * 4);
+				p2p_buffer_param p = {};
+				p.packing = p2p_rgba32_be;
+				p.width = m_FramesWidth;
+				p.height = m_FramesHeight;
+				p.dst[0] = imageBuffer;
+				p.dst_stride[0] = m_FramesWidth * 4;
+				for (int plane = 0; plane < 3; plane++) {
+					p.src[plane] = m_VSAPI->getReadPtr(frame, plane);
+					p.src_stride[plane] = m_VSAPI->getStride(frame, plane);
+				}
+				p2p_pack_frame(&p, P2P_ALPHA_SET_ONE);
 				const VSMap* props = m_VSAPI->getFramePropertiesRO(frame);
 				int err = 0;
 				const char* freezeFrameProp = m_VSAPI->mapGetData(props, "IVTCDN_FreezeFrame", 0, &err);
 				std::string freezeFrame = err ? "" : freezeFrameProp;
-				const uint8_t* frame_ptr = m_VSAPI->getReadPtr(frame, 0);
-				m_Frames[i]->SetData(frame_ptr);
+				m_Frames[i]->SetData(imageBuffer);
 				m_FreezeFrames[i] = freezeFrame;
 				m_VSAPI->freeFrame(frame);
+				free(imageBuffer);
 			} else {
 				// Sleep for vsync? minimized window uses 100% of 1 CPU core since this is a busy wait without any actions
 			}
@@ -279,6 +306,7 @@ public:
 			m_JsonProps["notes"][i] = notes[i % 10];
 		}
 		LoadFrames();
+		m_ActiveCycle = 0;
 	}
 
 	void SaveJson() {
@@ -342,43 +370,6 @@ private:
 		m_VSAPI->mapSetInt(argument_map, "format", pfRGB24, maReplace);
 		m_VSAPI->mapSetInt(argument_map, "matrix_in", 1, maReplace);
 		VSMap* result_map = m_VSAPI->invoke(resize_plugin, "Spline36", argument_map);
-
-		const char* result_error = m_VSAPI->mapGetError(result_map);
-		if (result_error) {
-			fprintf(stderr, "%s\n", result_error);
-		}
-
-		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
-		m_VSAPI->freeMap(argument_map);
-		m_VSAPI->freeMap(result_map);
-		return output;
-	}
-
-	VSNode* ShufflePlanes(VSCore* core, VSNode* &node) {
-		VSMap* argument_map = m_VSAPI->createMap();
-		VSPlugin* std_plugin = m_VSAPI->getPluginByID("com.vapoursynth.std", core);
-		m_VSAPI->mapConsumeNode(argument_map, "clips", node, maReplace);
-		const int64_t planes[] = {2, 1, 0};
-		m_VSAPI->mapSetIntArray(argument_map, "planes", planes, 3);
-		m_VSAPI->mapSetInt(argument_map, "colorfamily", cfRGB, maReplace);
-		VSMap* result_map = m_VSAPI->invoke(std_plugin, "ShufflePlanes", argument_map);
-
-		const char* result_error = m_VSAPI->mapGetError(result_map);
-		if (result_error) {
-			fprintf(stderr, "%s\n", result_error);
-		}
-
-		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
-		m_VSAPI->freeMap(argument_map);
-		m_VSAPI->freeMap(result_map);
-		return output;
-	}
-
-	VSNode* Pack(VSCore* core, VSNode* &node) {
-		VSMap* argument_map = m_VSAPI->createMap();
-		VSPlugin* libp2p_plugin = m_VSAPI->getPluginByID("com.djatom.libp2p", core);
-		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
-		VSMap* result_map = m_VSAPI->invoke(libp2p_plugin, "Pack", argument_map);
 
 		const char* result_error = m_VSAPI->mapGetError(result_map);
 		if (result_error) {
@@ -581,12 +572,8 @@ private:
 			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
 			m_FieldsNode = SeparateFields(core, m_FieldsNode);
 			m_FieldsNode = ConvertToRGB(core, m_FieldsNode);
-			m_FieldsNode = ShufflePlanes(core, m_FieldsNode);
-			m_FieldsNode = Pack(core, m_FieldsNode);
 		} else if (vi->format.colorFamily == cfRGB) {
 			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
-			m_FieldsNode = ShufflePlanes(core, m_FieldsNode);
-			m_FieldsNode = Pack(core, m_FieldsNode);
 		} else {
 			// Hope for the best?
 		}
@@ -621,10 +608,10 @@ private:
 			m_FramesNode = SeparateFields(core, rawFieldsNode);
 			m_FramesNode = IVTCDN(core, m_FramesNode);
 			m_FramesNode = ConvertToRGB(core, m_FramesNode);
-			m_FramesNode = ShufflePlanes(core, m_FramesNode);
-			m_FramesNode = Pack(core, m_FramesNode);
 		} else if (vi->format.colorFamily == cfRGB) {
-			// TODO
+			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
+			m_FramesNode = SeparateFields(core, rawFieldsNode);
+			m_FramesNode = IVTCDN(core, m_FramesNode);
 		} else {
 			// Hope for the best?
 		}
