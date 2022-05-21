@@ -1,7 +1,7 @@
 #include <gzip/config.hpp>
 
 // zlib
-#include "../miniz.h"
+#include "miniz.h"
 
 // std
 #include <limits>

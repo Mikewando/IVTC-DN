@@ -49,6 +49,8 @@ group "Dependencies"
       -- For other operating systems, build GLFW in the cloned git submodule:
       include "vendor/GLFW"
    end
+   include "vendor/miniz"
+   include "vendor/libp2p"
 group ""
 
 group "Core"

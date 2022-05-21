@@ -10,7 +10,7 @@
 #include "Walnut/Application.h"
 #include "Walnut/EntryPoint.h"
 
-#include <format>
+//#include <format>
 #include <fstream>
 #include <GLFW/glfw3.h> // For drag-n-drop files
 #include <iostream>
