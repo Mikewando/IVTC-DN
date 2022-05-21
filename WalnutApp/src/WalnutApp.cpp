@@ -131,23 +131,31 @@ public:
 			}
 		}
 
+		ImVec2 availableSpace = ImGui::GetContentRegionAvail();
+		float fieldDisplayWidth = availableSpace.x / 6.15f; // TODO maybe tables make this more precise?
+		float fieldDisplayHeight = m_FramesWidth ? fieldDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
+
 		// Top Fields
 		for (int i = 0; i < 11; i += 2) {
 			if (m_Fields[i] != nullptr) {
-				DrawField(i);
+				DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
 			}
 		}
 
 		// Bottom Fields
 		for (int i = 1; i < 10; i += 2) {
 			if (m_Fields[i] != nullptr) {
-				DrawField(i);
+				DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
 			}
 		}
 
 		ImGui::End();
 
 		ImGui::Begin("Output");
+
+		availableSpace = ImGui::GetContentRegionAvail();
+		float frameDisplayWidth = availableSpace.x / 4.1f; // TODO maybe tables make this more precise?
+		float frameDisplayHeight = m_FramesWidth ? frameDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
 
 		for (int i = 0; i < 4; i++) {
 			if (m_Frames[i] == nullptr) {
@@ -165,13 +173,18 @@ public:
 					fprintf(stderr, error_message);
 					error = 1;
 				}
+				const VSMap* props = m_VSAPI->getFramePropertiesRO(frame);
+				int err = 0;
+				const char* freezeFrameProp = m_VSAPI->mapGetData(props, "IVTCDN_FreezeFrame", 0, &err);
+				std::string freezeFrame = err ? "" : freezeFrameProp;
 				const uint8_t* frame_ptr = m_VSAPI->getReadPtr(frame, 0);
 				m_Frames[i]->SetData(frame_ptr);
+				m_FreezeFrames[i] = freezeFrame;
 				m_VSAPI->freeFrame(frame);
 			} else {
 				// Sleep for vsync? minimized window uses 100% of 1 CPU core since this is a busy wait without any actions
 			}
-			DrawFrame(i);
+			DrawFrame(i, frameDisplayWidth, frameDisplayHeight);
 		}
 
 		ImGui::End();
@@ -281,8 +294,6 @@ public:
 	}
 
 private:
-	ImFont* m_UbuntuMonoFont = nullptr;
-
 	const VSAPI* m_VSAPI = nullptr;
 	const VSSCRIPTAPI* m_VSSAPI = nullptr;
 	std::string m_ProjectFile = "";
@@ -305,31 +316,13 @@ private:
 	int m_FramesHeight = 0;
 	int m_FramesFrameCount = 0;
 	std::shared_ptr<Walnut::Image> m_Frames[4] = {};
+	std::string m_FreezeFrames[4] = {};
 
 	VSNode* SeparateFields(VSCore* core, VSNode* &node) {
 		VSMap* argument_map = m_VSAPI->createMap();
 		VSPlugin* std_plugin = m_VSAPI->getPluginByID("com.vapoursynth.std", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
 		VSMap* result_map = m_VSAPI->invoke(std_plugin, "SeparateFields", argument_map);
-
-		const char* result_error = m_VSAPI->mapGetError(result_map);
-		if (result_error) {
-			fprintf(stderr, "%s\n", result_error);
-		}
-
-		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
-		m_VSAPI->freeMap(argument_map);
-		m_VSAPI->freeMap(result_map);
-		return output;
-	}
-
-	VSNode* Resize(VSCore* core, VSNode* &node, int64_t width, int64_t height) {
-		VSMap* argument_map = m_VSAPI->createMap();
-		VSPlugin* resize_plugin = m_VSAPI->getPluginByID("com.vapoursynth.resize", core);
-		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
-		m_VSAPI->mapSetInt(argument_map, "width", width, maReplace);
-		m_VSAPI->mapSetInt(argument_map, "height", height, maReplace);
-		VSMap* result_map = m_VSAPI->invoke(resize_plugin, "Spline36", argument_map);
 
 		const char* result_error = m_VSAPI->mapGetError(result_map);
 		if (result_error) {
@@ -418,13 +411,14 @@ private:
 		return output;
 	}
 
-	void DrawField(int i) {
+	void DrawField(const int i, const float display_width, const float display_height) {
 		int activeField = m_ActiveCycle * 10 + i;
 		if (activeField >= m_FieldsFrameCount) {
 			return;
 		}
 		ImVec2 pos = ImGui::GetCursorScreenPos();
-		ImGui::Image(m_Fields[i]->GetDescriptorSet(), { (float)m_FieldsWidth, (float)m_FieldsHeight });
+		//ImGui::Image(m_Fields[i]->GetDescriptorSet(), { (float)m_FieldsWidth, (float)m_FieldsHeight });
+		ImGui::Image(m_Fields[i]->GetDescriptorSet(), { display_width, display_height });
 		auto& note = m_JsonProps["notes"][activeField];
 		auto& action = m_JsonProps["ivtc_actions"][activeField];
 		auto& scene_changes = m_JsonProps["scene_changes"];
@@ -475,23 +469,25 @@ private:
 		if (std::find(scene_changes.begin(), scene_changes.end(), activeField) != scene_changes.end()) {
 			ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x - 5, pos.y), ImVec2(pos.x, pos.y + 300), IM_COL32(255, 128, 0, 255));
 		}
-		ImVec2 text_pos(pos.x + 184, pos.y + 118);
-		ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(text_pos.x - 4, text_pos.y + 5), ImVec2(text_pos.x + 40, text_pos.y + 60), ColorForAction(action.get<int_fast8_t>()));
-		ImGui::GetWindowDrawList()->AddText(m_UbuntuMonoFont, 64.0f, text_pos, IM_COL32_WHITE, note.get<std::string>().c_str());
-		std::string id = std::format("field{}", i);
-		ImGui::PushID(id.c_str());
-		if (ImGui::BeginPopupContextItem(id.c_str())) {
-			ImGui::Text("This a popup for field %d!", i);
-			ImGui::EndPopup();
-		}
+		ImVec2 textSize = g_UbuntuMonoFont->CalcTextSizeA(64.0f, FLT_MAX, 0.0f, note.get<std::string>().c_str());
+		ImVec2 textPos(pos.x + display_width / 2 - textSize.x / 2, pos.y + display_height / 2 - textSize.y / 2);
+		ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(textPos.x - 4, textPos.y + 5), ImVec2(textPos.x + textSize.x + 4, textPos.y + textSize.y), ColorForAction(action.get<int_fast8_t>()));
+		ImGui::GetWindowDrawList()->AddText(g_UbuntuMonoFont, 64.0f, textPos, IM_COL32_WHITE, note.get<std::string>().c_str());
+		//std::string id = std::format("field{}", i);
+		//ImGui::PushID(id.c_str());
+		//if (ImGui::BeginPopupContextItem(id.c_str())) {
+		//	ImGui::Text("This a popup for field %d!", i);
+		//	ImGui::EndPopup();
+		//}
+		//ImGui::PopID();
 		if (i != 10 && (m_FieldsFrameCount - activeField) > 2) {
 			ImGui::SameLine();
 		}
-		ImGui::PopID();
 	}
 
-	void DrawFrame(int i) {
-		ImGui::Image(m_Frames[i]->GetDescriptorSet(), { (float)m_FramesWidth, (float)m_FramesHeight });
+	void DrawFrame(const int i, const float display_width, const float display_height) {
+		ImVec2 pos = ImGui::GetCursorScreenPos();
+		ImGui::Image(m_Frames[i]->GetDescriptorSet(), { display_width, display_height });
 		if (ImGui::IsItemHovered()) {
 			auto activeFrame = std::to_string(m_ActiveCycle * 4 + i);
 			if (ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -507,7 +503,16 @@ private:
 			ImGui::Text("Frame %d", i);
 			ImGui::EndTooltip();
 		}
-		std::string id = std::format("frame{}", i);
+		auto freezeFrame = m_FreezeFrames[i];
+		auto action = freezeFrame.empty() ? i * 2 : 8;
+		ImGui::GetWindowDrawList()->AddRect(ImVec2(pos.x, pos.y), ImVec2(pos.x + display_width, pos.y + display_height), ColorForAction(action), 0, 0, 4);
+		if (!freezeFrame.empty()) {
+			ImVec2 textSize = g_UbuntuMonoFont->CalcTextSizeA(64.0f, FLT_MAX, 0.0f, freezeFrame.c_str());
+			ImVec2 textPos(pos.x + display_width / 2 - textSize.x / 2, pos.y + display_height / 2 - textSize.y / 2);
+			ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(textPos.x - 4, textPos.y + 5), ImVec2(textPos.x + textSize.x, textPos.y + textSize.y), ColorForAction(action));
+			ImGui::GetWindowDrawList()->AddText(g_UbuntuMonoFont, 64.0f, textPos, IM_COL32_WHITE, freezeFrame.c_str());
+		}
+		//std::string id = std::format("frame{}", i);
 		//ImGui::PushID(id.c_str());
 		//ImGui::PopID();
 		if (i < 4) {
@@ -576,7 +581,6 @@ private:
 			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
 			m_FieldsNode = SeparateFields(core, m_FieldsNode);
 			m_FieldsNode = ConvertToRGB(core, m_FieldsNode);
-			m_FieldsNode = Resize(core, m_FieldsNode, 400, 300);
 			m_FieldsNode = ShufflePlanes(core, m_FieldsNode);
 			m_FieldsNode = Pack(core, m_FieldsNode);
 		} else if (vi->format.colorFamily == cfRGB) {
@@ -617,7 +621,6 @@ private:
 			m_FramesNode = SeparateFields(core, rawFieldsNode);
 			m_FramesNode = IVTCDN(core, m_FramesNode);
 			m_FramesNode = ConvertToRGB(core, m_FramesNode);
-			m_FramesNode = Resize(core, m_FramesNode, 600, 450);
 			m_FramesNode = ShufflePlanes(core, m_FramesNode);
 			m_FramesNode = Pack(core, m_FramesNode);
 		} else if (vi->format.colorFamily == cfRGB) {
