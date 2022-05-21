@@ -9,5 +9,7 @@ bin-int/
 *.vcxproj.filters
 *.sln
 
+*Makefile
+
 # Exclude
 !vendor/bin
