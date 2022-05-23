@@ -9,7 +9,7 @@ The intended outcome is similar to that of other manual IVTC tools such as [Wobb
 What IVTC DN does:
  - Does clearly display every input field to the user
  - Does allow the user to make field matching and decimation decisions at the same time
- - Does limit required prerequsite plugins
+ - Does limit required prerequisite plugins
  - Does output a single project file; can be used for one-line IVTC in scripts
 
 What IVTC DN doesn't do:
