@@ -73,7 +73,7 @@ Once you are happy with your result (or if you just want to save progress) you c
 
 ## Using the Project File
 
-Using the project file in an output script is straightforward. The (IVTC DN plugin)[https://github.com/Mikewando/IVTC-DN-plugin] README has more details, but as a simple example:
+Using the project file in an output script is straightforward. The [IVTC DN plugin](https://github.com/Mikewando/IVTC-DN-plugin) README has more details, but as a simple example:
 
 ```python
 import vapoursynth as vs
