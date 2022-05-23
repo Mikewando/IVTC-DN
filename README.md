@@ -90,6 +90,7 @@ clip.set_output() # Output is progressive and IVTC'd content
 I haven't spent much time testing builds on different systems, so this section is sparse. Broadly most dependencies should be bundled, so hopefully if you are familiar with C++ builds you can build it.
 
 `premake5 vs2022` _should_ generate a visual studio 2022 project file for windows builds.
+
 `premake5 gmake2` _should_ generate a gnu makefile for linux builds.
 
 # 3rd party libaries
