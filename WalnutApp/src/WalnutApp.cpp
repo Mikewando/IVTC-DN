@@ -574,6 +574,7 @@ private:
 			m_FieldsNode = ConvertToRGB(core, m_FieldsNode);
 		} else if (vi->format.colorFamily == cfRGB) {
 			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
+			m_FieldsNode = SeparateFields(core, m_FieldsNode);
 		} else {
 			// Hope for the best?
 		}
