@@ -1,5 +1,7 @@
 # IVTC DN
 
+![IVTC DN](https://user-images.githubusercontent.com/3258334/169749030-038619c2-1534-41d2-9034-212c4813a457.png)
+
 IVTC DN is a GUI tool to manually perform Inverse Telecine (IVTC) of [Vapoursynth](https://github.com/vapoursynth/vapoursynth) scripts. It uses [Walnut](https://github.com/TheCherno/Walnut), which uses [Dear ImGui](https://github.com/ocornut/imgui), to render the UI.
 
 The intended outcome is similar to that of other manual IVTC tools such as [Wobbly](https://github.com/dubhater/Wobbly) and [Yatta](https://github.com/hatt/Yatta), but the approach taken by IVTC DN is different.
