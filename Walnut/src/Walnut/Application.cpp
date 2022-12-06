@@ -15,6 +15,9 @@
 
 #include <iostream>
 
+#include <chrono>
+#include <thread>
+
 // Emedded font
 #include "ImGui/Roboto-Regular.embed"
 #include "ImGui/UbuntuMono.embed"
@@ -659,8 +662,12 @@ namespace Walnut {
 			}
 
 			// Present Main Platform Window
-			if (!main_is_minimized)
+			if (!main_is_minimized) {
 				FramePresent(wd);
+			} else {
+				// Sleep if window is minimized to avoid 100% cpu usage
+				std::this_thread::sleep_for(std::chrono::microseconds(6944)); // Approx 144Hz
+			}
 		}
 
 	}

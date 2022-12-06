@@ -97,7 +97,7 @@ public:
 		m_NeedNewFields |= last_cycle != m_ActiveCycle;
 		last_cycle = m_ActiveCycle;
 
-		int max_cycle = m_FieldsFrameCount / 10;
+		int max_cycle = (m_FieldsFrameCount - 1) / 10;
 
 		if (m_ActiveCycle < max_cycle && (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_J))) {
 			m_ActiveCycle++;
@@ -116,7 +116,10 @@ public:
 
 		ImGui::Begin("Fields");
 
-		for (int i = 0; i < 11; i++) {
+		int remaining_fields = m_FieldsFrameCount - (m_ActiveCycle * 10);
+		int fields_in_cycle = min(remaining_fields, 11);
+
+		for (int i = 0; i < fields_in_cycle; i++) {
 			if (m_Fields[i] == nullptr) {
 				continue;
 			}
@@ -126,6 +129,7 @@ public:
 				if (!frame) {
 					fprintf(stderr, error_message);
 					error = 1;
+					continue;
 				}
 				uint8_t* imageBuffer = (uint8_t*)malloc(m_FieldsWidth * m_FieldsHeight * 4);
 				p2p_buffer_param p = {};
@@ -151,14 +155,14 @@ public:
 		float fieldDisplayHeight = m_FramesWidth ? fieldDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
 
 		// Top Fields
-		for (int i = 0; i < 11; i += 2) {
+		for (int i = 0; i < fields_in_cycle; i += 2) {
 			if (m_Fields[i] != nullptr) {
 				DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
 			}
 		}
 
 		// Bottom Fields
-		for (int i = 1; i < 10; i += 2) {
+		for (int i = 1; i < min(fields_in_cycle, 10); i += 2) {
 			if (m_Fields[i] != nullptr) {
 				DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
 			}
@@ -172,7 +176,8 @@ public:
 		float frameDisplayWidth = availableSpace.x / 4.1f; // TODO maybe tables make this more precise?
 		float frameDisplayHeight = m_FramesWidth ? frameDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
 
-		for (int i = 0; i < 4; i++) {
+		int frames_in_cycle = fields_in_cycle * 4 / 10;
+		for (int i = 0; i < frames_in_cycle; i++) {
 			if (m_Frames[i] == nullptr) {
 				continue;
 			}
@@ -187,6 +192,7 @@ public:
 				if (!frame) {
 					fprintf(stderr, error_message);
 					error = 1;
+					continue;
 				}
 				uint8_t* imageBuffer = (uint8_t*)malloc(m_FramesWidth * m_FramesHeight * 4);
 				p2p_buffer_param p = {};
@@ -208,8 +214,6 @@ public:
 				m_FreezeFrames[i] = freezeFrame;
 				m_VSAPI->freeFrame(frame);
 				free(imageBuffer);
-			} else {
-				// Sleep for vsync? minimized window uses 100% of 1 CPU core since this is a busy wait without any actions
 			}
 			DrawFrame(i, frameDisplayWidth, frameDisplayHeight);
 		}
@@ -221,7 +225,7 @@ public:
 		ImGui::SameLine(); HelpMarker("CTRL+click to input value.");
 
 		ImGui::End();
-		//ImGui::ShowDemoWindow();
+		ImGui::ShowDemoWindow();
 
 		if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
 			if (m_ProjectFile.empty()) {
@@ -407,6 +411,7 @@ private:
 		if (activeField >= m_FieldsFrameCount) {
 			return;
 		}
+        ImGuiIO& io = ImGui::GetIO();
 		ImVec2 pos = ImGui::GetCursorScreenPos();
 		//ImGui::Image(m_Fields[i]->GetDescriptorSet(), { (float)m_FieldsWidth, (float)m_FieldsHeight });
 		ImGui::Image(m_Fields[i]->GetDescriptorSet(), { display_width, display_height });
@@ -455,6 +460,23 @@ private:
 			}
 			ImGui::BeginTooltip();
 			ImGui::Text("Field %d", i);
+			float region_size = 32.0f;
+			float region_x = io.MousePos.x - pos.x - region_size * 0.5f;
+			float region_y = io.MousePos.y - pos.y - region_size * 0.5f;
+			float zoom = 4.0f;
+			if (region_x < 0.0f) {
+				region_x = 0.0f;
+			} else if (region_x > display_width - region_size) {
+				region_x = display_width - region_size;
+			}
+			if (region_y < 0.0f) {
+				region_y = 0.0f;
+			} else if (region_y > display_height - region_size) {
+				region_y = display_height - region_size;
+			}
+			ImVec2 uv0 = ImVec2((region_x) / display_width, (region_y) / display_height);
+			ImVec2 uv1 = ImVec2((region_x + region_size) / display_width, (region_y + region_size) / display_height);
+			ImGui::Image(m_Fields[i]->GetDescriptorSet(), ImVec2(region_size * zoom, region_size * zoom), uv0, uv1);
 			ImGui::EndTooltip();
 		}
 		if (std::find(scene_changes.begin(), scene_changes.end(), activeField) != scene_changes.end()) {
@@ -477,6 +499,7 @@ private:
 	}
 
 	void DrawFrame(const int i, const float display_width, const float display_height) {
+        ImGuiIO& io = ImGui::GetIO();
 		ImVec2 pos = ImGui::GetCursorScreenPos();
 		ImGui::Image(m_Frames[i]->GetDescriptorSet(), { display_width, display_height });
 		if (ImGui::IsItemHovered()) {
@@ -492,6 +515,23 @@ private:
 
 			ImGui::BeginTooltip();
 			ImGui::Text("Frame %d", i);
+			float region_size = 32.0f;
+			float region_x = io.MousePos.x - pos.x - region_size * 0.5f;
+			float region_y = io.MousePos.y - pos.y - region_size * 0.5f;
+			float zoom = 4.0f;
+			if (region_x < 0.0f) {
+				region_x = 0.0f;
+			} else if (region_x > display_width - region_size) {
+				region_x = display_width - region_size;
+			}
+			if (region_y < 0.0f) {
+				region_y = 0.0f;
+			} else if (region_y > display_height - region_size) {
+				region_y = display_height - region_size;
+			}
+			ImVec2 uv0 = ImVec2((region_x) / display_width, (region_y) / display_height);
+			ImVec2 uv1 = ImVec2((region_x + region_size) / display_width, (region_y + region_size) / display_height);
+			ImGui::Image(m_Frames[i]->GetDescriptorSet(), ImVec2(region_size * zoom, region_size * zoom), uv0, uv1);
 			ImGui::EndTooltip();
 		}
 		auto freezeFrame = m_FreezeFrames[i];
