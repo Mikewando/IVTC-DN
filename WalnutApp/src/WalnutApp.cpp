@@ -1,3 +1,5 @@
+#define NOMINMAX
+
 #include "p2p.h"
 #include "p2p_api.h"
 #include "gzip/compress.hpp"
@@ -117,7 +119,7 @@ public:
 		ImGui::Begin("Fields");
 
 		int remaining_fields = m_FieldsFrameCount - (m_ActiveCycle * 10);
-		int fields_in_cycle = min(remaining_fields, 11);
+		int fields_in_cycle = std::min(remaining_fields, 11);
 
 		for (int i = 0; i < fields_in_cycle; i++) {
 			if (m_Fields[i] == nullptr) {
@@ -162,7 +164,7 @@ public:
 		}
 
 		// Bottom Fields
-		for (int i = 1; i < min(fields_in_cycle, 10); i += 2) {
+		for (int i = 1; i < std::min(fields_in_cycle, 10); i += 2) {
 			if (m_Fields[i] != nullptr) {
 				DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
 			}
