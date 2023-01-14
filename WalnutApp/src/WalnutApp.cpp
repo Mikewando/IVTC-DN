@@ -17,6 +17,8 @@
 #include <GLFW/glfw3.h> // For drag-n-drop files
 #include <iostream>
 
+#include "icon.h"
+
 using nlohmann::json;
 
 ImFont* g_UbuntuMonoFont = nullptr;
@@ -720,5 +722,7 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 		}
 	});
 	glfwSetDropCallback(app->GetWindowHandle(), glfw_drop_callback);
+	GLFWimage image(32, 32, ICON_DATA);
+	glfwSetWindowIcon(app->GetWindowHandle(), 1, &image);
 	return app;
 }
