@@ -152,72 +152,82 @@ public:
 			}
 		}
 
-		ImVec2 availableSpace = ImGui::GetContentRegionAvail();
-		float fieldDisplayWidth = availableSpace.x / 6.15f; // TODO maybe tables make this more precise?
-		float fieldDisplayHeight = m_FramesWidth ? fieldDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
-
-		// Top Fields
-		for (int i = 0; i < fields_in_cycle; i += 2) {
-			if (m_Fields[i] != nullptr) {
-				DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
+		if (ImGui::BeginTable("field table", 6)) {
+			ImGui::TableNextRow();
+			// Top Fields
+			for (int i = 0; i < fields_in_cycle; i += 2) {
+				ImGui::TableNextColumn();
+				if (m_Fields[i] != nullptr) {
+					float fieldDisplayWidth = ImGui::GetContentRegionAvail().x;
+					float fieldDisplayHeight = m_FramesWidth ? fieldDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
+					DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
+				}
 			}
-		}
 
-		// Bottom Fields
-		for (int i = 1; i < std::min(fields_in_cycle, 10); i += 2) {
-			if (m_Fields[i] != nullptr) {
-				DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
+			ImGui::TableNextRow();
+			// Bottom Fields
+			for (int i = 1; i < std::min(fields_in_cycle, 10); i += 2) {
+				ImGui::TableNextColumn();
+				if (m_Fields[i] != nullptr) {
+					float fieldDisplayWidth = ImGui::GetContentRegionAvail().x;
+					float fieldDisplayHeight = m_FramesWidth ? fieldDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
+					DrawField(i, fieldDisplayWidth, fieldDisplayHeight);
+				}
 			}
+			ImGui::EndTable();
 		}
 
 		ImGui::End();
 
 		ImGui::Begin("Output");
 
-		availableSpace = ImGui::GetContentRegionAvail();
-		float frameDisplayWidth = availableSpace.x / 4.1f; // TODO maybe tables make this more precise?
-		float frameDisplayHeight = m_FramesWidth ? frameDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
-
 		int frames_in_cycle = fields_in_cycle * 4 / 10;
-		for (int i = 0; i < frames_in_cycle; i++) {
-			if (m_Frames[i] == nullptr) {
-				continue;
-			}
-
-			int activeFrame = m_ActiveCycle * 4 + i;
-			if (activeFrame >= m_FramesFrameCount) {
-				break;
-			}
-
-			if (m_NeedNewFields && !error) {
-				const VSFrame* frame = m_VSAPI->getFrame(activeFrame, m_FramesNode, error_message, sizeof(error_message));
-				if (!frame) {
-					fprintf(stderr, error_message);
-					error = 1;
+		if (ImGui::BeginTable("frame table", 4)) {
+			ImGui::TableNextRow();
+			for (int i = 0; i < frames_in_cycle; i++) {
+				if (m_Frames[i] == nullptr) {
 					continue;
 				}
-				uint8_t* imageBuffer = (uint8_t*)malloc(m_FramesWidth * m_FramesHeight * 4);
-				p2p_buffer_param p = {};
-				p.packing = p2p_rgba32_be;
-				p.width = m_FramesWidth;
-				p.height = m_FramesHeight;
-				p.dst[0] = imageBuffer;
-				p.dst_stride[0] = m_FramesWidth * 4;
-				for (int plane = 0; plane < 3; plane++) {
-					p.src[plane] = m_VSAPI->getReadPtr(frame, plane);
-					p.src_stride[plane] = m_VSAPI->getStride(frame, plane);
+
+				int activeFrame = m_ActiveCycle * 4 + i;
+				if (activeFrame >= m_FramesFrameCount) {
+					break;
 				}
-				p2p_pack_frame(&p, P2P_ALPHA_SET_ONE);
-				const VSMap* props = m_VSAPI->getFramePropertiesRO(frame);
-				int err = 0;
-				const char* freezeFrameProp = m_VSAPI->mapGetData(props, "IVTCDN_FreezeFrame", 0, &err);
-				std::string freezeFrame = err ? "" : freezeFrameProp;
-				m_Frames[i]->SetData(imageBuffer);
-				m_FreezeFrames[i] = freezeFrame;
-				m_VSAPI->freeFrame(frame);
-				free(imageBuffer);
+
+				if (m_NeedNewFields && !error) {
+					const VSFrame* frame = m_VSAPI->getFrame(activeFrame, m_FramesNode, error_message, sizeof(error_message));
+					if (!frame) {
+						fprintf(stderr, error_message);
+						error = 1;
+						continue;
+					}
+					uint8_t* imageBuffer = (uint8_t*)malloc(m_FramesWidth * m_FramesHeight * 4);
+					p2p_buffer_param p = {};
+					p.packing = p2p_rgba32_be;
+					p.width = m_FramesWidth;
+					p.height = m_FramesHeight;
+					p.dst[0] = imageBuffer;
+					p.dst_stride[0] = m_FramesWidth * 4;
+					for (int plane = 0; plane < 3; plane++) {
+						p.src[plane] = m_VSAPI->getReadPtr(frame, plane);
+						p.src_stride[plane] = m_VSAPI->getStride(frame, plane);
+					}
+					p2p_pack_frame(&p, P2P_ALPHA_SET_ONE);
+					const VSMap* props = m_VSAPI->getFramePropertiesRO(frame);
+					int err = 0;
+					const char* freezeFrameProp = m_VSAPI->mapGetData(props, "IVTCDN_FreezeFrame", 0, &err);
+					std::string freezeFrame = err ? "" : freezeFrameProp;
+					m_Frames[i]->SetData(imageBuffer);
+					m_FreezeFrames[i] = freezeFrame;
+					m_VSAPI->freeFrame(frame);
+					free(imageBuffer);
+				}
+				ImGui::TableNextColumn();
+				float frameDisplayWidth = ImGui::GetContentRegionAvail().x;
+				float frameDisplayHeight = m_FramesWidth ? frameDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
+				DrawFrame(i, frameDisplayWidth, frameDisplayHeight);
 			}
-			DrawFrame(i, frameDisplayWidth, frameDisplayHeight);
+			ImGui::EndTable();
 		}
 
 		ImGui::End();
@@ -415,7 +425,6 @@ private:
 		}
         ImGuiIO& io = ImGui::GetIO();
 		ImVec2 pos = ImGui::GetCursorScreenPos();
-		//ImGui::Image(m_Fields[i]->GetDescriptorSet(), { (float)m_FieldsWidth, (float)m_FieldsHeight });
 		ImGui::Image(m_Fields[i]->GetDescriptorSet(), { display_width, display_height });
 		auto& note = m_JsonProps["notes"][activeField];
 		auto& action = m_JsonProps["ivtc_actions"][activeField];
@@ -488,22 +497,19 @@ private:
 		ImVec2 textPos(pos.x + display_width / 2 - textSize.x / 2, pos.y + display_height / 2 - textSize.y / 2);
 		ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(textPos.x - 4, textPos.y + 5), ImVec2(textPos.x + textSize.x + 4, textPos.y + textSize.y), ColorForAction(action.get<int_fast8_t>()));
 		ImGui::GetWindowDrawList()->AddText(g_UbuntuMonoFont, 64.0f, textPos, IM_COL32_WHITE, note.get<std::string>().c_str());
-		//std::string id = std::format("field{}", i);
-		//ImGui::PushID(id.c_str());
-		//if (ImGui::BeginPopupContextItem(id.c_str())) {
-		//	ImGui::Text("This a popup for field %d!", i);
-		//	ImGui::EndPopup();
-		//}
-		//ImGui::PopID();
-		if (i != 10 && (m_FieldsFrameCount - activeField) > 2) {
-			ImGui::SameLine();
-		}
 	}
 
 	void DrawFrame(const int i, const float display_width, const float display_height) {
         ImGuiIO& io = ImGui::GetIO();
 		ImVec2 pos = ImGui::GetCursorScreenPos();
 		ImGui::Image(m_Frames[i]->GetDescriptorSet(), { display_width, display_height });
+
+		static const char* context_labels[4] = { "frame 0 context", "frame 1 context", "frame 2 context", "frame 3 context" };
+		if (ImGui::BeginPopupContextItem(context_labels[i])) {
+			ImGui::Text("TODO menu %d", i);
+			ImGui::EndPopup();
+		}
+
 		if (ImGui::IsItemHovered()) {
 			auto activeFrame = std::to_string(m_ActiveCycle * 4 + i);
 			if (ImGui::IsKeyPressed(ImGuiKey_F)) {
@@ -544,12 +550,6 @@ private:
 			ImVec2 textPos(pos.x + display_width / 2 - textSize.x / 2, pos.y + display_height / 2 - textSize.y / 2);
 			ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(textPos.x - 4, textPos.y + 5), ImVec2(textPos.x + textSize.x, textPos.y + textSize.y), ColorForAction(action));
 			ImGui::GetWindowDrawList()->AddText(g_UbuntuMonoFont, 64.0f, textPos, IM_COL32_WHITE, freezeFrame.c_str());
-		}
-		//std::string id = std::format("frame{}", i);
-		//ImGui::PushID(id.c_str());
-		//ImGui::PopID();
-		if (i < 4) {
-			ImGui::SameLine();
 		}
 	}
 
