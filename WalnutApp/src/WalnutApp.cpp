@@ -117,14 +117,14 @@ public:
 			if (m_ActiveCycle > 0 && (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_K))) {
 				m_ActiveCycle--;
 			}
-		}
 
-		if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-			LoadFrames();
-		}
+			if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+				LoadFrames();
+			}
 
-		if (ImGui::IsKeyPressed(ImGuiKey_T)) {
-			ApplyCycleToScene();
+			if (ImGui::IsKeyPressed(ImGuiKey_T)) {
+				ApplyCycleToScene();
+			}
 		}
 
 		ImGui::Begin("Fields");
@@ -258,6 +258,11 @@ public:
 				}
 				auto textCallbackData = TextCallbackData{ activeFrame, this };
 				ImGui::InputTextMultiline(property_labels[i], &input, ImVec2(-FLT_MIN, input_height), ImGuiInputTextFlags_CallbackEdit, AttributeCallback, &textCallbackData);
+				if (ImGui::IsItemHovered()) {
+					ImGui::BeginTooltip();
+					ImGui::Text("Extra Attributes");
+					ImGui::EndTooltip();
+				}
 			}
 			ImGui::EndTable();
 		}
@@ -478,47 +483,57 @@ private:
 		auto& action = m_JsonProps["ivtc_actions"][activeField];
 		auto& scene_changes = m_JsonProps["scene_changes"];
 		if (ImGui::IsItemHovered()) {
-			if (ImGui::IsKeyPressed(ImGuiKey_S) && !io.KeyCtrl) {
-				auto it = std::find(scene_changes.begin(), scene_changes.end(), activeField);
-				if (it == scene_changes.end()) {
-					scene_changes.push_back(activeField);
-				} else {
-					scene_changes.erase(it);
+			if (!io.WantCaptureKeyboard) { // Only enable hotkeys while text inputs are not capturing input
+				if (ImGui::IsKeyPressed(ImGuiKey_S) && !io.KeyCtrl) {
+					auto it = std::find(scene_changes.begin(), scene_changes.end(), activeField);
+					if (it == scene_changes.end()) {
+						scene_changes.push_back(activeField);
+					}
+					else {
+						scene_changes.erase(it);
+					}
 				}
-			}
 
-			if (ImGui::IsKeyPressed(ImGuiKey_A)) {
-				note = "A";
-			} else if (ImGui::IsKeyPressed(ImGuiKey_B)) {
-				note = "B";
-			} else if (ImGui::IsKeyPressed(ImGuiKey_C)) {
-				note = "C";
-			} else if (ImGui::IsKeyPressed(ImGuiKey_D)) {
-				note = "D";
-			}
+				if (ImGui::IsKeyPressed(ImGuiKey_A)) {
+					note = "A";
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_B)) {
+					note = "B";
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_C)) {
+					note = "C";
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_D)) {
+					note = "D";
+				}
 
-			const int fieldOffset = i % 2;
-			static const int drop = 8;
-			if (ImGui::IsKeyPressed(ImGuiKey_1) && i < 11) {
-				int positiveAction = 0 + i % 2;
-				action = action == positiveAction ? drop : positiveAction;
-			} else if (ImGui::IsKeyPressed(ImGuiKey_2) && i < 11) {
-				int positiveAction = 2 + i % 2;
-				action = action == positiveAction ? drop : positiveAction;
-			} else if (ImGui::IsKeyPressed(ImGuiKey_3) && i < 11) {
-				int positiveAction = 4 + i % 2;
-				action = action == positiveAction ? drop : positiveAction;
-			} else if (ImGui::IsKeyPressed(ImGuiKey_4)) {
-				if (i < 10) {
-					int positiveAction = 6 + i % 2;
+				const int fieldOffset = i % 2;
+				static const int drop = 8;
+				if (ImGui::IsKeyPressed(ImGuiKey_1) && i < 11) {
+					int positiveAction = 0 + i % 2;
 					action = action == positiveAction ? drop : positiveAction;
-				} else {
-					int positiveAction = 9;
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_2) && i < 11) {
+					int positiveAction = 2 + i % 2;
 					action = action == positiveAction ? drop : positiveAction;
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_3) && i < 11) {
+					int positiveAction = 4 + i % 2;
+					action = action == positiveAction ? drop : positiveAction;
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_4)) {
+					if (i < 10) {
+						int positiveAction = 6 + i % 2;
+						action = action == positiveAction ? drop : positiveAction;
+					}
+					else {
+						int positiveAction = 9;
+						action = action == positiveAction ? drop : positiveAction;
+					}
 				}
 			}
 			ImGui::BeginTooltip();
-			ImGui::Text("Field %d", i);
+			ImGui::Text("In Frame %d", activeField / 2);
 			float region_size = 32.0f;
 			float region_x = io.MousePos.x - pos.x - region_size * 0.5f;
 			float region_y = io.MousePos.y - pos.y - region_size * 0.5f;
@@ -560,17 +575,20 @@ private:
 
 		if (ImGui::IsItemHovered()) {
 			auto activeFrame = std::to_string(m_ActiveCycle * 4 + i);
-			if (ImGui::IsKeyPressed(ImGuiKey_F)) {
-				auto& no_match_handling = m_JsonProps["no_match_handling"];
-				if (no_match_handling.contains(activeFrame)) {
-					no_match_handling.erase(activeFrame);
-				} else {
-					no_match_handling[activeFrame] = "Next";
+			if (!io.WantCaptureKeyboard) { // Only enable hotkeys while text inputs are not capturing input
+				if (ImGui::IsKeyPressed(ImGuiKey_F)) {
+					auto& no_match_handling = m_JsonProps["no_match_handling"];
+					if (no_match_handling.contains(activeFrame)) {
+						no_match_handling.erase(activeFrame);
+					}
+					else {
+						no_match_handling[activeFrame] = "Next";
+					}
 				}
 			}
 
 			ImGui::BeginTooltip();
-			ImGui::Text("Frame %d", i);
+			ImGui::Text("Out Frame %s", activeFrame);
 			float region_size = 32.0f;
 			float region_x = io.MousePos.x - pos.x - region_size * 0.5f;
 			float region_y = io.MousePos.y - pos.y - region_size * 0.5f;
