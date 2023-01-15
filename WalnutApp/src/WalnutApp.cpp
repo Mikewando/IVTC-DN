@@ -66,11 +66,12 @@ class ExampleLayer : public Walnut::Layer
 {
 public:
 	virtual void OnAttach() override {
-		ImGuiIO io = ImGui::GetIO();
+		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
 	}
 
 	virtual void OnUIRender() override {
+		ImGuiIO& io = ImGui::GetIO();
 		static int error = 0;
 		static char error_message[1024];
 
@@ -109,11 +110,13 @@ public:
 
 		int max_cycle = (m_FieldsFrameCount - 1) / 10;
 
-		if (m_ActiveCycle < max_cycle && (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_J))) {
-			m_ActiveCycle++;
-		}
-		if (m_ActiveCycle > 0 && (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_K))) {
-			m_ActiveCycle--;
+		if (!io.WantCaptureKeyboard) { // Only enable navigation while text inputs are not capturing input
+			if (m_ActiveCycle < max_cycle && (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_J))) {
+				m_ActiveCycle++;
+			}
+			if (m_ActiveCycle > 0 && (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_K))) {
+				m_ActiveCycle--;
+			}
 		}
 
 		if (ImGui::IsKeyPressed(ImGuiKey_R)) {
@@ -268,7 +271,7 @@ public:
 		ImGui::End();
 		ImGui::ShowDemoWindow();
 
-		if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+		if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
 			if (m_ProjectFile.empty()) {
 				SaveProjectAsDialog();
 			} else {
@@ -276,11 +279,11 @@ public:
 			}
 		}
 
-		if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O)) {
+		if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O)) {
 			OpenProjectDialog();
 		}
 
-		if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N)) {
+		if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N)) {
 			NewProjectDialog();
 		}
 
@@ -470,7 +473,7 @@ private:
 		auto& action = m_JsonProps["ivtc_actions"][activeField];
 		auto& scene_changes = m_JsonProps["scene_changes"];
 		if (ImGui::IsItemHovered()) {
-			if (ImGui::IsKeyPressed(ImGuiKey_S) && !ImGui::GetIO().KeyCtrl) {
+			if (ImGui::IsKeyPressed(ImGuiKey_S) && !io.KeyCtrl) {
 				auto it = std::find(scene_changes.begin(), scene_changes.end(), activeField);
 				if (it == scene_changes.end()) {
 					scene_changes.push_back(activeField);
