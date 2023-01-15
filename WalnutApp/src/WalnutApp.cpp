@@ -114,6 +114,7 @@ public:
 			if (m_ActiveCycle < max_cycle && (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_J))) {
 				m_ActiveCycle++;
 			}
+
 			if (m_ActiveCycle > 0 && (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_K))) {
 				m_ActiveCycle--;
 			}
@@ -124,6 +125,7 @@ public:
 
 			if (ImGui::IsKeyPressed(ImGuiKey_T)) {
 				ApplyCycleToScene();
+				AutoLoadFrames();
 			}
 		}
 
@@ -247,15 +249,12 @@ public:
 
 		if (ImGui::BeginTable("attribute table", 4)) {
 			ImGui::TableNextRow();
-			static const char* property_labels[11] = { "properties 0", "properties 1", "properties 2", "properties 3", "properties 4", "properties 5", "properties 6", "properties 7", "properties 8", "properties 9", "properties 10" };
+			// ## is an invisible label, usually clipped anyway but we might not have a full table
+			static const char* property_labels[11] = { "##properties 0", "##properties 1", "##properties 2", "##properties 3", "##properties 4", "##properties 5", "##properties 6", "##properties 7", "##properties 8", "##properties 9", "##properties 10" };
 			const float input_height = std::max(ImGui::GetContentRegionAvail().y - 8, ImGui::GetTextLineHeight() * 4); // 8 is arbitrary, we just want to avoid unnecessary scrollbar, I think using table padding would work fine but I'm not sure how to get/set it
 			for (int i = 0; i < frames_in_cycle; i++) {
 				ImGui::TableNextColumn();
 				const int activeFrame = m_ActiveCycle * 4 + i;
-				if (!m_JsonProps.contains("extra_attributes")) {
-					m_JsonProps["extra_attributes"] = json();
-				}
-
 				auto& extra_attributes = m_JsonProps["extra_attributes"];
 				const std::string activeFrameKey = std::to_string(activeFrame);
 				std::string input;
@@ -343,6 +342,13 @@ public:
 		ImGuiFileDialog::Instance()->OpenModal("SaveProjectAsDialog", "Choose project file", ".ivtc", path.path + "/.");
 	}
 
+	template <typename ValueType> static ValueType SetDefault(json& object, std::string attribute, ValueType defaultValue) {
+		if (!object.contains(attribute)) {
+			object[attribute] = defaultValue;
+		}
+		return object[attribute];
+	}
+
 	void OpenProject(const char* project_path_name) {
 		m_ProjectFile = std::string(project_path_name);
 		std::ifstream input(m_ProjectFile, std::ios::binary | std::ios::ate);
@@ -354,9 +360,20 @@ public:
 		input.read(compressed.data(), inputSize);
 		std::string decompressed = gzip::decompress(compressed.data(), inputSize);
 		m_JsonProps = json::parse(decompressed);
-		m_ActiveCycle = m_JsonProps["project_garbage"]["active_cycle"];
-		std::string script_file = m_JsonProps["project_garbage"]["script_file"];
+		SetDefault(m_JsonProps, "notes", json::array());
+		SetDefault(m_JsonProps, "no_match_handling", json::object());
+		SetDefault(m_JsonProps, "project_garbage", json::object());
+		SetDefault(m_JsonProps, "extra_attributes", json::object());
+		SetDefault(m_JsonProps, "scene_changes", json::array());
+
+		auto& projectGarbage = m_JsonProps["project_garbage"];
+		m_AutoReload = SetDefault(projectGarbage, "auto_reload", true);
+		SetDefault(projectGarbage, "active_cycle", 0);
+
+		m_ActiveCycle = projectGarbage["active_cycle"];
+		std::string script_file = projectGarbage["script_file"];
 		SetActiveFields(script_file.c_str(), true);
+		m_ProjectOpened = true;
 	}
 
 	void StartNewProject(const char* script_path_name) {
@@ -368,7 +385,8 @@ public:
 			"notes": [],
 			"scene_changes": [],
 			"no_match_handling": {},
-			"project_garbage": {}
+			"project_garbage": { "auto_reload": true },
+			"extra_attributes": {}
 		})"_json;
 		m_JsonProps["project_garbage"]["script_file"] = script_path_name;
 		SetActiveFields(script_path_name, false);
@@ -379,6 +397,8 @@ public:
 		}
 		LoadFrames();
 		m_ActiveCycle = 0;
+		m_AutoReload = true;
+		m_ProjectOpened = true;
 	}
 
 	void SaveJson() {
@@ -392,6 +412,13 @@ public:
 		std::ofstream output(m_ProjectFile, std::ios::binary);
 		output << compressed;
 	}
+
+	void UpdateAutoReload() {
+		m_JsonProps["project_garbage"]["auto_reload"] = m_AutoReload;
+	}
+
+	bool m_AutoReload = true;
+	bool m_ProjectOpened = false;
 
 private:
 	const VSAPI* m_VSAPI = nullptr;
@@ -515,23 +542,28 @@ private:
 				if (ImGui::IsKeyPressed(ImGuiKey_1) && i < 11) {
 					int positiveAction = 0 + i % 2;
 					action = action == positiveAction ? drop : positiveAction;
+					AutoLoadFrames();
 				}
 				else if (ImGui::IsKeyPressed(ImGuiKey_2) && i < 11) {
 					int positiveAction = 2 + i % 2;
 					action = action == positiveAction ? drop : positiveAction;
+					AutoLoadFrames();
 				}
 				else if (ImGui::IsKeyPressed(ImGuiKey_3) && i < 11) {
 					int positiveAction = 4 + i % 2;
 					action = action == positiveAction ? drop : positiveAction;
+					AutoLoadFrames();
 				}
 				else if (ImGui::IsKeyPressed(ImGuiKey_4)) {
 					if (i < 10) {
 						int positiveAction = 6 + i % 2;
 						action = action == positiveAction ? drop : positiveAction;
+						AutoLoadFrames();
 					}
 					else {
 						int positiveAction = 9;
 						action = action == positiveAction ? drop : positiveAction;
+						AutoLoadFrames();
 					}
 				}
 			}
@@ -583,9 +615,11 @@ private:
 					auto& no_match_handling = m_JsonProps["no_match_handling"];
 					if (no_match_handling.contains(activeFrame)) {
 						no_match_handling.erase(activeFrame);
+						AutoLoadFrames();
 					}
 					else {
 						no_match_handling[activeFrame] = "Next";
+						AutoLoadFrames();
 					}
 				}
 			}
@@ -707,6 +741,12 @@ private:
 		}
 	}
 
+	void AutoLoadFrames() {
+		if (m_AutoReload) {
+			LoadFrames();
+		}
+	}
+
 	void LoadFrames() {
 		if (m_FramesNode != nullptr) {
 			m_VSAPI->freeNode(m_FramesNode);
@@ -784,6 +824,10 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 			}
 			if (ImGui::MenuItem("Exit")) {
 				app->Close();
+			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("Auto-reload", nullptr, &g_Layer->m_AutoReload, g_Layer->m_ProjectOpened)) {
+				g_Layer->UpdateAutoReload();
 			}
 			ImGui::EndMenu();
 		}
