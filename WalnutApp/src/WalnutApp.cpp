@@ -360,14 +360,20 @@ public:
 		input.read(compressed.data(), inputSize);
 		std::string decompressed = gzip::decompress(compressed.data(), inputSize);
 		m_JsonProps = json::parse(decompressed);
-		SetDefault(m_JsonProps, "notes", json::array());
 		SetDefault(m_JsonProps, "no_match_handling", json::object());
 		SetDefault(m_JsonProps, "project_garbage", json::object());
 		SetDefault(m_JsonProps, "extra_attributes", json::object());
-		SetDefault(m_JsonProps, "scene_changes", json::array());
 
 		auto& projectGarbage = m_JsonProps["project_garbage"];
 		m_AutoReload = SetDefault(projectGarbage, "auto_reload", true);
+		if (!projectGarbage.contains("version")) {
+			// Support legacy projects with top-level notes and scene changes
+			SetDefault(projectGarbage, "notes", m_JsonProps["notes"]);
+			SetDefault(projectGarbage, "scene_changes", m_JsonProps["scene_changes"]);
+			projectGarbage["version"] = 1;
+		}
+		SetDefault(projectGarbage, "notes", json::array());
+		SetDefault(projectGarbage, "scene_changes", json::array());
 		SetDefault(projectGarbage, "active_cycle", 0);
 
 		m_ActiveCycle = projectGarbage["active_cycle"];
@@ -382,10 +388,13 @@ public:
 		m_ProjectFile = "";
 		m_JsonProps = R"({
 			"ivtc_actions": [],
-			"notes": [],
-			"scene_changes": [],
 			"no_match_handling": {},
-			"project_garbage": { "auto_reload": true },
+			"project_garbage": {
+				"version": 1,
+				"auto_reload": true,
+				"notes": [],
+				"scene_changes": []
+			},
 			"extra_attributes": {}
 		})"_json;
 		m_JsonProps["project_garbage"]["script_file"] = script_path_name;
@@ -393,7 +402,7 @@ public:
 		const VSVideoInfo* vi = m_VSAPI->getVideoInfo(m_FieldsNode);
 		for (int i = 0; i < vi->numFrames; i++) {
 			m_JsonProps["ivtc_actions"][i] = actions[i % 10];
-			m_JsonProps["notes"][i] = notes[i % 10];
+			m_JsonProps["project_garbage"]["notes"][i] = notes[i % 10];
 		}
 		LoadFrames();
 		m_ActiveCycle = 0;
@@ -509,9 +518,9 @@ private:
         ImGuiIO& io = ImGui::GetIO();
 		ImVec2 pos = ImGui::GetCursorScreenPos();
 		ImGui::Image(m_Fields[i]->GetDescriptorSet(), { display_width, display_height });
-		auto& note = m_JsonProps["notes"][activeField];
+		auto& note = m_JsonProps["project_garbage"]["notes"][activeField];
 		auto& action = m_JsonProps["ivtc_actions"][activeField];
-		auto& scene_changes = m_JsonProps["scene_changes"];
+		auto& scene_changes = m_JsonProps["project_garbage"]["scene_changes"];
 		if (ImGui::IsItemHovered()) {
 			if (!io.WantCaptureKeyboard) { // Only enable hotkeys while text inputs are not capturing input
 				if (ImGui::IsKeyPressed(ImGuiKey_S) && !io.KeyCtrl) {
@@ -589,7 +598,7 @@ private:
 			ImGui::EndTooltip();
 		}
 		if (std::find(scene_changes.begin(), scene_changes.end(), activeField) != scene_changes.end()) {
-			ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x - 5, pos.y), ImVec2(pos.x, pos.y + 300), IM_COL32(255, 128, 0, 255));
+			ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x - 5, pos.y), ImVec2(pos.x, pos.y + display_height), IM_COL32(255, 128, 0, 255));
 		}
 		ImVec2 textSize = g_UbuntuMonoFont->CalcTextSizeA(64.0f, FLT_MAX, 0.0f, note.get<std::string>().c_str());
 		ImVec2 textPos(pos.x + display_width / 2 - textSize.x / 2, pos.y + display_height / 2 - textSize.y / 2);
@@ -657,9 +666,9 @@ private:
 	}
 
 	void ApplyCycleToScene() {
-		auto& notes = m_JsonProps["notes"];
+		auto& notes = m_JsonProps["project_garbage"]["notes"];
 		auto& actions = m_JsonProps["ivtc_actions"];
-		const auto& scene_changes = m_JsonProps["scene_changes"];
+		const auto& scene_changes = m_JsonProps["project_garbage"]["scene_changes"];
 
 		int start_of_cycle = m_ActiveCycle * 10;
 		int end_of_cycle = start_of_cycle + 9;
