@@ -18,6 +18,7 @@
 #include <iostream>
 
 #include "icon.h"
+#include "imgui_stdlib.h"
 
 using nlohmann::json;
 
@@ -55,6 +56,11 @@ static ImU32 ColorForAction(const int_fast8_t action) {
 	};
 	return map.at(action);
 }
+
+struct TextCallbackData {
+	const int activeFrame;
+	void* layer;
+};
 
 class ExampleLayer : public Walnut::Layer
 {
@@ -191,7 +197,7 @@ public:
 					continue;
 				}
 
-				int activeFrame = m_ActiveCycle * 4 + i;
+				const int activeFrame = m_ActiveCycle * 4 + i;
 				if (activeFrame >= m_FramesFrameCount) {
 					break;
 				}
@@ -229,13 +235,34 @@ public:
 				float frameDisplayHeight = m_FramesWidth ? frameDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
 				DrawFrame(i, frameDisplayWidth, frameDisplayHeight);
 			}
+			ImGui::TableNextRow();
+			static const char* property_labels[11] = { "properties 0", "properties 1", "properties 2", "properties 3", "properties 4", "properties 5", "properties 6", "properties 7", "properties 8", "properties 9", "properties 10" };
+			const float input_height = std::max(ImGui::GetContentRegionAvail().y - 8, ImGui::GetTextLineHeight() * 4); // 8 is arbitrary, we just want to avoid unnecessary scrollbar, I think using table padding would work fine but I'm not sure how to get/set it
+			for (int i = 0; i < frames_in_cycle; i++) {
+				ImGui::TableNextColumn();
+				const int activeFrame = m_ActiveCycle * 4 + i;
+				if (!m_JsonProps.contains("extra_attributes")) {
+					m_JsonProps["extra_attributes"] = json();
+				}
+
+				auto& extra_attributes = m_JsonProps["extra_attributes"];
+				const std::string activeFrameKey = std::to_string(activeFrame);
+				std::string input;
+				if (!extra_attributes.contains(activeFrameKey)) {
+					input = std::string();
+				} else {
+					input = extra_attributes[activeFrameKey];
+				}
+				auto textCallbackData = TextCallbackData{ activeFrame, this };
+				ImGui::InputTextMultiline(property_labels[i], &input, ImVec2(-FLT_MIN, input_height), ImGuiInputTextFlags_CallbackEdit, AttributeCallback, &textCallbackData);
+			}
 			ImGui::EndTable();
 		}
 
 		ImGui::End();
 
 		ImGui::Begin("Controls");
-		ImGui::SliderInt("Active Cycle", &m_ActiveCycle, 0, max_cycle);
+		ImGui::SliderInt("Active Cycle", &m_ActiveCycle, 0, max_cycle, nullptr, ImGuiSliderFlags_AlwaysClamp);
 		ImGui::SameLine(); HelpMarker("CTRL+click to input value.");
 
 		ImGui::End();
@@ -272,6 +299,17 @@ public:
 		// Failure only happens on very rare API version mismatches and usually doesn't need to be checked
 		m_VSAPI = m_VSSAPI->getVSAPI(VAPOURSYNTH_API_VERSION);
 		assert(m_VSAPI);
+	}
+
+	int static AttributeCallback(ImGuiInputTextCallbackData* data) {
+		auto cbData = (TextCallbackData*)data->UserData;
+		auto activeFrame = cbData->activeFrame;
+		auto* layer = (ExampleLayer*)cbData->layer;
+		auto& extra_attributes = layer->m_JsonProps["extra_attributes"];
+		const std::string activeFrameKey = std::to_string(activeFrame);
+		extra_attributes[activeFrameKey] = std::string(data->Buf);
+
+		return 0;
 	}
 
 	void OpenProjectDialog() {
