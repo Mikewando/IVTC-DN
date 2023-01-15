@@ -533,7 +533,7 @@ private:
 				}
 			}
 			ImGui::BeginTooltip();
-			ImGui::Text("In Frame %d", activeField / 2);
+			ImGui::Text("In %d", activeField / 2);
 			float region_size = 32.0f;
 			float region_x = io.MousePos.x - pos.x - region_size * 0.5f;
 			float region_y = io.MousePos.y - pos.y - region_size * 0.5f;
@@ -588,7 +588,7 @@ private:
 			}
 
 			ImGui::BeginTooltip();
-			ImGui::Text("Out Frame %s", activeFrame);
+			ImGui::Text("Out %s", activeFrame);
 			float region_size = 32.0f;
 			float region_x = io.MousePos.x - pos.x - region_size * 0.5f;
 			float region_y = io.MousePos.y - pos.y - region_size * 0.5f;
