@@ -310,7 +310,12 @@ public:
 		auto* layer = (ExampleLayer*)cbData->layer;
 		auto& extra_attributes = layer->m_JsonProps["extra_attributes"];
 		const std::string activeFrameKey = std::to_string(activeFrame);
-		extra_attributes[activeFrameKey] = std::string(data->Buf);
+		auto text = std::string(data->Buf);
+		if (text.empty() || std::all_of(text.begin(), text.end(), isspace)) {
+			extra_attributes.erase(activeFrameKey);
+		} else {
+			extra_attributes[activeFrameKey] = text;
+		}
 
 		return 0;
 	}
