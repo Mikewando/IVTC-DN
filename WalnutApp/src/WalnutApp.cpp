@@ -238,6 +238,14 @@ public:
 				float frameDisplayHeight = m_FramesWidth ? frameDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
 				DrawFrame(i, frameDisplayWidth, frameDisplayHeight);
 			}
+			ImGui::EndTable();
+		}
+
+		ImGui::End();
+
+		ImGui::Begin("Extra Attributes");
+
+		if (ImGui::BeginTable("attribute table", 4)) {
 			ImGui::TableNextRow();
 			static const char* property_labels[11] = { "properties 0", "properties 1", "properties 2", "properties 3", "properties 4", "properties 5", "properties 6", "properties 7", "properties 8", "properties 9", "properties 10" };
 			const float input_height = std::max(ImGui::GetContentRegionAvail().y - 8, ImGui::GetTextLineHeight() * 4); // 8 is arbitrary, we just want to avoid unnecessary scrollbar, I think using table padding would work fine but I'm not sure how to get/set it
@@ -258,18 +266,13 @@ public:
 				}
 				auto textCallbackData = TextCallbackData{ activeFrame, this };
 				ImGui::InputTextMultiline(property_labels[i], &input, ImVec2(-FLT_MIN, input_height), ImGuiInputTextFlags_CallbackEdit, AttributeCallback, &textCallbackData);
-				if (ImGui::IsItemHovered()) {
-					ImGui::BeginTooltip();
-					ImGui::Text("Extra Attributes");
-					ImGui::EndTooltip();
-				}
 			}
 			ImGui::EndTable();
 		}
 
 		ImGui::End();
 
-		ImGui::Begin("Controls");
+		ImGui::Begin("Navigation");
 		ImGui::SliderInt("Active Cycle", &m_ActiveCycle, 0, max_cycle, nullptr, ImGuiSliderFlags_AlwaysClamp);
 		ImGui::SameLine(); HelpMarker("CTRL+click to input value.");
 
