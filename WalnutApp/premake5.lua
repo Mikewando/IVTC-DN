@@ -36,7 +36,7 @@ project "IVTCDN"
       links { "%{LibraryDir.vapoursynth}/vapoursynth.lib", "%{LibraryDir.vapoursynth}/vsscript.lib" }
     end
     if os.istarget("linux") then
-      links { "vapoursynth", "vapoursynth-script" }
+      links { "vulkan", "vapoursynth", "vapoursynth-script" }
     end
 
    targetdir ("../bin/" .. outputdir .. "/%{prj.name}")

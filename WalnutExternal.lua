@@ -36,17 +36,6 @@ group "Dependencies"
       linux_dpkg_check_if_package_is_installed("libvulkan-dev")
       linux_dpkg_check_if_package_is_installed("mesa-vulkan-drivers")
       linux_dpkg_check_if_package_is_installed("vulkan-tools")
-      vulkaninfo_dir = os.pathsearch("vulkaninfo", os.getenv("PATH"))
-      if not vulkaninfo_dir then
-         premake.warn("vulkaninfo not found. Be sure that Vulkan works.")
-      else
-         vulkaninfo = vulkaninfo_dir .. "/vulkaninfo"
-         local result, errorCode = os.outputof(vulkaninfo)
-         if errorCode ~= 0 or string.find(result, "ERROR") then
-               premake.error(vulkaninfo .. " reported an ERROR, please check")
-         end
-         premake.info(vulkaninfo .. " did not show an error, good.")
-      end
    else
       -- For other operating systems, build GLFW in the cloned git submodule:
       include "vendor/GLFW"

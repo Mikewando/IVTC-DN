@@ -1,0 +1,91 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+  
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Setup premake
+        uses: abel0b/setup-premake@v2.2
+        with:
+          version: 5.0.0-beta2
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.0.2
+      - name: Prepare Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1.2.0
+        with:
+          vulkan-query-version: latest
+          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          vulkan-use-cache: true
+      - name: Run premake
+        run: premake5 vs2022
+      - name: Build
+        run: msbuild /m /p:Configuration=Dist IVTCDN.sln
+      - name: Copy imgui.ini
+        run: cp example/imgui.ini bin/Dist-windows-x86_64/IVTCDN/imgui.ini
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: IVTCDN-windows
+          path: |
+            bin/Dist-windows-x86_64/IVTCDN/IVTCDN.exe
+            bin/Dist-windows-x86_64/IVTCDN/imgui.ini
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Setup premake
+        uses: abel0b/setup-premake@v2.2
+        with:
+          version: 5.0.0-beta2
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install libglfw3-dev mesa-vulkan-drivers vulkan-tools cython3 
+      - name: Install VapourSynth
+        run: |
+          git clone https://github.com/vapoursynth/vapoursynth --depth 1
+          pushd vapoursynth
+          git clone https://github.com/sekrit-twc/zimg --branch v3.0 --depth 1
+          pushd zimg
+          ./autogen.sh
+          ./configure --prefix=/usr
+          make -j2
+          sudo make install -j2
+          popd
+          rm -rf zimg
+
+          ./autogen.sh
+          ./configure --prefix=/usr
+          make -j2
+          sudo make install -j2
+          popd
+          rm -rf vapoursynth
+      - name: Prepare Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1.2.0
+        with:
+          vulkan-query-version: latest
+          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          vulkan-use-cache: true
+      - name: Run premake
+        run: premake5 gmake2
+      - name: Build
+        run: make config=dist
+      - name: Copy imgui.ini
+        run: cp example/imgui.ini bin/Dist-linux-x86_64/IVTCDN/imgui.ini
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: IVTCDN-linux
+          path: |
+            bin/Dist-linux-x86_64/IVTCDN/IVTCDN
+            bin/Dist-linux-x86_64/IVTCDN/imgui.ini
