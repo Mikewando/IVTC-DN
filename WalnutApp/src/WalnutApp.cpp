@@ -129,6 +129,10 @@ public:
 			}
 		}
 
+		if (m_WantNewFrames) {
+			LoadFrames();
+		}
+
 		ImGui::Begin("Fields");
 
 		int remaining_fields = m_FieldsFrameCount - (m_ActiveCycle * 10);
@@ -464,6 +468,7 @@ private:
 
 	int m_ActiveCycle = 0;
 	bool m_NeedNewFields = false;
+	bool m_WantNewFrames = false;
 
 	// Fields
 	VSScript* m_FieldsScriptEnvironment = nullptr;
@@ -687,12 +692,10 @@ private:
 					auto& no_match_handling = m_JsonProps["no_match_handling"];
 					if (no_match_handling.contains(activeFrame)) {
 						no_match_handling.erase(activeFrame);
-						AutoLoadFrames();
-					}
-					else {
+					} else {
 						no_match_handling[activeFrame] = "Next";
-						AutoLoadFrames();
 					}
+					AutoLoadFrames();
 				}
 			}
 
@@ -822,7 +825,7 @@ private:
 
 	void AutoLoadFrames() {
 		if (m_AutoReload) {
-			LoadFrames();
+			m_WantNewFrames = true;
 		}
 	}
 
@@ -866,6 +869,7 @@ private:
 		}
 
 		m_NeedNewFields = true;
+		m_WantNewFrames = false;
 	}
 };
 
