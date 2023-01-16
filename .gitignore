@@ -14,3 +14,4 @@ imgui.ini
 
 # Exclude
 !vendor/bin
+!example/imgui.ini
