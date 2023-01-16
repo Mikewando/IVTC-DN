@@ -32,4 +32,5 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v3
         with:
+          name: IVTCDN
           path: bin/Dist-windows-x86_64/IVTCDN/IVTCDN.exe

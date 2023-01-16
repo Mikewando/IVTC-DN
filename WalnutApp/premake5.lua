@@ -45,6 +45,8 @@ project "IVTCDN"
    filter "system:windows"
       systemversion "latest"
       defines { "WL_PLATFORM_WINDOWS" }
+      files { 'IVTCDN.rc', '**.ico' }
+      vpaths { ['Resources/*'] = { '*.rc', '**.ico' } }
 
    filter "configurations:Debug"
       defines { "WL_DEBUG" }
