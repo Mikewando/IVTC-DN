@@ -169,7 +169,7 @@ public:
 			}
 		}
 
-		if (ImGui::BeginTable("field table", 6)) {
+		if (ImGui::BeginTable("field table", 6, ImGuiTableFlags_PadOuterX)) {
 			ImGui::TableNextRow();
 			// Top Fields
 			for (int i = 0; i < fields_in_cycle; i += 2) {
@@ -199,7 +199,7 @@ public:
 		ImGui::Begin("Output");
 
 		int frames_in_cycle = fields_in_cycle * 4 / 10;
-		if (ImGui::BeginTable("frame table", 4)) {
+		if (ImGui::BeginTable("frame table", 4, ImGuiTableFlags_PadOuterX)) {
 			ImGui::TableNextRow();
 			for (int i = 0; i < frames_in_cycle; i++) {
 				if (m_Frames[i] == nullptr) {
@@ -264,7 +264,7 @@ public:
 
 		ImGui::Begin("Extra Attributes");
 
-		if (ImGui::BeginTable("attribute table", 4)) {
+		if (ImGui::BeginTable("attribute table", 4, ImGuiTableFlags_PadOuterX)) {
 			ImGui::TableNextRow();
 			// ## is an invisible label, usually clipped anyway but we might not have a full table
 			static const char* property_labels[11] = { "##properties 0", "##properties 1", "##properties 2", "##properties 3", "##properties 4", "##properties 5", "##properties 6", "##properties 7", "##properties 8", "##properties 9", "##properties 10" };
