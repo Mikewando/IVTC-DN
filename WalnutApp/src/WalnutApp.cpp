@@ -232,6 +232,7 @@ public:
 					p2p_pack_frame(&p, P2P_ALPHA_SET_ONE);
 					const VSMap* props = m_VSAPI->getFramePropertiesRO(frame);
 					int err = 0;
+					m_FieldCount[i] = m_VSAPI->mapGetInt(props, "IVTCDN_Fields", 0, &err);
 					const char* freezeFrameProp = m_VSAPI->mapGetData(props, "IVTCDN_FreezeFrame", 0, &err);
 					std::string freezeFrame = err ? "" : freezeFrameProp;
 					m_Frames[i]->SetData(imageBuffer);
@@ -248,12 +249,13 @@ public:
 				float frameDisplayHeight = m_FramesWidth ? frameDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
 				DrawFrame(i, frameDisplayWidth, frameDisplayHeight);
 			}
-			if (m_CombedDetection) {
-				ImGui::TableNextRow();
-				for (int i = 0; i < frames_in_cycle; i++) {
-					ImGui::TableNextColumn();
+			ImGui::TableNextRow();
+			for (int i = 0; i < frames_in_cycle; i++) {
+				ImGui::TableNextColumn();
+				if (m_CombedDetection) {
 					ImGui::Text("Combed Metric: %d", m_CombedMetrics[i]);
 				}
+				ImGui::Text("Matched Fields: %d", m_FieldCount[i]);
 			}
 			ImGui::EndTable();
 		}
@@ -484,6 +486,7 @@ private:
 	int m_FramesHeight = 0;
 	int m_FramesFrameCount = 0;
 	std::shared_ptr<Walnut::Image> m_Frames[4] = {};
+	int m_FieldCount[4] = {};
 	std::string m_FreezeFrames[4] = {};
 	int m_CombedMetrics[4] = {};
 
@@ -719,6 +722,10 @@ private:
 			ImVec2 uv1 = ImVec2((region_x + region_size) / display_width, (region_y + region_size) / display_height);
 			ImGui::Image(m_Frames[i]->GetDescriptorSet(), ImVec2(region_size * zoom, region_size * zoom), uv0, uv1);
 			ImGui::EndTooltip();
+		}
+
+		if (m_FieldCount[i] == 1) {
+			ImGui::GetWindowDrawList()->AddLine(ImVec2(pos.x, pos.y + (display_height / 2)), ImVec2(pos.x + display_width, pos.y + (display_height / 2)), IM_COL32(255, 255, 0, 128), 10);
 		}
 
 		if (m_CombedDetection && m_CombedMetrics[i] > m_CombedThreshold) {
