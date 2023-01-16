@@ -1,8 +1,8 @@
 -- premake5.lua
-workspace "WalnutApp"
+workspace "IVTCDN"
    architecture "x64"
    configurations { "Debug", "Release", "Dist" }
-   startproject "WalnutApp"
+   startproject "IVTCDN"
 
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
