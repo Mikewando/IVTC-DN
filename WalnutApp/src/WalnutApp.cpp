@@ -232,6 +232,10 @@ public:
 					std::string freezeFrame = err ? "" : freezeFrameProp;
 					m_Frames[i]->SetData(imageBuffer);
 					m_FreezeFrames[i] = freezeFrame;
+					if (m_VSAPI->mapNumElements(props, "VMetrics") == 2) {
+						const int64_t* vmetrics = m_VSAPI->mapGetIntArray(props, "VMetrics", &err);
+						m_CombedMetrics[i] = err ? -1 : vmetrics[1];
+					}
 					m_VSAPI->freeFrame(frame);
 					free(imageBuffer);
 				}
@@ -239,6 +243,13 @@ public:
 				float frameDisplayWidth = ImGui::GetContentRegionAvail().x;
 				float frameDisplayHeight = m_FramesWidth ? frameDisplayWidth * ((float)m_FramesHeight / m_FramesWidth) : 0;
 				DrawFrame(i, frameDisplayWidth, frameDisplayHeight);
+			}
+			if (m_CombedDetection) {
+				ImGui::TableNextRow();
+				for (int i = 0; i < frames_in_cycle; i++) {
+					ImGui::TableNextColumn();
+					ImGui::Text("Combed Metric: %d", m_CombedMetrics[i]);
+				}
 			}
 			ImGui::EndTable();
 		}
@@ -374,9 +385,10 @@ public:
 		}
 		SetDefault(projectGarbage, "notes", json::array());
 		SetDefault(projectGarbage, "scene_changes", json::array());
-		SetDefault(projectGarbage, "active_cycle", 0);
+		m_ActiveCycle = SetDefault(projectGarbage, "active_cycle", 0);
+		m_CombedDetection = SetDefault(projectGarbage, "combed_detection", false);
+		m_CombedThreshold = SetDefault(projectGarbage, "combed_threshold", 45);
 
-		m_ActiveCycle = projectGarbage["active_cycle"];
 		std::string script_file = projectGarbage["script_file"];
 		SetActiveFields(script_file.c_str(), true);
 		m_ProjectOpened = true;
@@ -393,7 +405,9 @@ public:
 				"version": 1,
 				"auto_reload": true,
 				"notes": [],
-				"scene_changes": []
+				"scene_changes": [],
+				"combed_detection": false,
+				"combed_threshold": 45
 			},
 			"extra_attributes": {}
 		})"_json;
@@ -407,6 +421,8 @@ public:
 		LoadFrames();
 		m_ActiveCycle = 0;
 		m_AutoReload = true;
+		m_CombedDetection = false;
+		m_CombedThreshold = 45;
 		m_ProjectOpened = true;
 	}
 
@@ -426,8 +442,19 @@ public:
 		m_JsonProps["project_garbage"]["auto_reload"] = m_AutoReload;
 	}
 
+	void UpdateCombedDetection() {
+		m_JsonProps["project_garbage"]["combed_detection"] = m_CombedDetection;
+		LoadFrames();
+	}
+
+	void UpdateCombedThreshold() {
+		m_JsonProps["project_garbage"]["combed_threshold"] = m_CombedThreshold;
+	}
+
 	bool m_AutoReload = true;
 	bool m_ProjectOpened = false;
+	bool m_CombedDetection = false;
+	int m_CombedThreshold = 45;
 
 private:
 	const VSAPI* m_VSAPI = nullptr;
@@ -453,6 +480,7 @@ private:
 	int m_FramesFrameCount = 0;
 	std::shared_ptr<Walnut::Image> m_Frames[4] = {};
 	std::string m_FreezeFrames[4] = {};
+	int m_CombedMetrics[4] = {};
 
 	VSNode* SeparateFields(VSCore* core, VSNode* &node) {
 		VSMap* argument_map = m_VSAPI->createMap();
@@ -471,12 +499,30 @@ private:
 		return output;
 	}
 
+	VSNode* ConvertToYUV420P8(VSCore* core, VSNode* &node) {
+		VSMap* argument_map = m_VSAPI->createMap();
+		VSPlugin* resize_plugin = m_VSAPI->getPluginByID("com.vapoursynth.resize", core);
+		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
+		m_VSAPI->mapSetInt(argument_map, "format", pfYUV420P8, maReplace);
+		VSMap* result_map = m_VSAPI->invoke(resize_plugin, "Spline36", argument_map);
+
+		const char* result_error = m_VSAPI->mapGetError(result_map);
+		if (result_error) {
+			fprintf(stderr, "%s\n", result_error);
+		}
+
+		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		m_VSAPI->freeMap(argument_map);
+		m_VSAPI->freeMap(result_map);
+		return output;
+	}
+
 	VSNode* ConvertToRGB(VSCore* core, VSNode* &node) {
 		VSMap* argument_map = m_VSAPI->createMap();
 		VSPlugin* resize_plugin = m_VSAPI->getPluginByID("com.vapoursynth.resize", core);
 		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
 		m_VSAPI->mapSetInt(argument_map, "format", pfRGB24, maReplace);
-		m_VSAPI->mapSetInt(argument_map, "matrix_in", 1, maReplace);
+		m_VSAPI->mapSetInt(argument_map, "matrix_in", 5, maReplace);
 		VSMap* result_map = m_VSAPI->invoke(resize_plugin, "Spline36", argument_map);
 
 		const char* result_error = m_VSAPI->mapGetError(result_map);
@@ -498,6 +544,23 @@ private:
 		m_VSAPI->mapSetData(argument_map, "projectfile", rawProps.c_str(), rawProps.size(), dtUtf8, maReplace);
 		m_VSAPI->mapSetInt(argument_map, "rawproject", 1, maReplace);
 		VSMap* result_map = m_VSAPI->invoke(ivtcdn_plugin, "IVTC", argument_map);
+
+		const char* result_error = m_VSAPI->mapGetError(result_map);
+		if (result_error) {
+			fprintf(stderr, "%s\n", result_error);
+		}
+
+		VSNode* output = m_VSAPI->mapGetNode(result_map, "clip", 0, nullptr);
+		m_VSAPI->freeMap(argument_map);
+		m_VSAPI->freeMap(result_map);
+		return output;
+	}
+
+	VSNode* DMetrics(VSCore* core, VSNode* node) {
+		VSMap* argument_map = m_VSAPI->createMap();
+		VSPlugin* dmetrics_plugin = m_VSAPI->getPluginByID("com.vapoursynth.dmetrics", core);
+		m_VSAPI->mapConsumeNode(argument_map, "clip", node, maReplace);
+		VSMap* result_map = m_VSAPI->invoke(dmetrics_plugin, "DMetrics", argument_map);
 
 		const char* result_error = m_VSAPI->mapGetError(result_map);
 		if (result_error) {
@@ -654,6 +717,13 @@ private:
 			ImGui::Image(m_Frames[i]->GetDescriptorSet(), ImVec2(region_size * zoom, region_size * zoom), uv0, uv1);
 			ImGui::EndTooltip();
 		}
+
+		if (m_CombedDetection && m_CombedMetrics[i] > m_CombedThreshold) {
+			static int padding = 3; // Kind of arbitrary, but helps avoid corners clipping past border
+			ImGui::GetWindowDrawList()->AddLine(ImVec2(pos.x + padding, pos.y + padding), ImVec2(pos.x + display_width - padding, pos.y + display_height - padding), IM_COL32(255, 0, 0, 128), 10);
+			ImGui::GetWindowDrawList()->AddLine(ImVec2(pos.x + display_width - padding, pos.y + padding), ImVec2(pos.x + padding, pos.y + display_height - padding), IM_COL32(255, 0, 0, 128), 10);
+		}
+
 		auto freezeFrame = m_FreezeFrames[i];
 		auto action = freezeFrame.empty() ? i * 2 : 8;
 		ImGui::GetWindowDrawList()->AddRect(ImVec2(pos.x, pos.y), ImVec2(pos.x + display_width, pos.y + display_height), ColorForAction(action), 0, 0, 4);
@@ -768,11 +838,16 @@ private:
 			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
 			m_FramesNode = SeparateFields(core, rawFieldsNode);
 			m_FramesNode = IVTCDN(core, m_FramesNode);
+			if (m_CombedDetection) {
+				m_FramesNode = ConvertToYUV420P8(core, m_FramesNode);
+				m_FramesNode = DMetrics(core, m_FramesNode);
+			}
 			m_FramesNode = ConvertToRGB(core, m_FramesNode);
 		} else if (vi->format.colorFamily == cfRGB) {
 			VSCore* core = m_VSSAPI->getCore(m_FieldsScriptEnvironment);
 			m_FramesNode = SeparateFields(core, rawFieldsNode);
 			m_FramesNode = IVTCDN(core, m_FramesNode);
+			// Doesn't support DMetrics
 		} else {
 			// Hope for the best?
 		}
@@ -835,8 +910,31 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 				app->Close();
 			}
 			ImGui::Separator();
-			if (ImGui::MenuItem("Auto-reload", nullptr, &g_Layer->m_AutoReload, g_Layer->m_ProjectOpened)) {
+
+			if (!g_Layer->m_ProjectOpened) {
+				ImGui::BeginDisabled();
+			}
+			if (ImGui::Checkbox("Auto-reload", &g_Layer->m_AutoReload)) {
 				g_Layer->UpdateAutoReload();
+			}
+			if (ImGui::Checkbox("Combed Detection", &g_Layer->m_CombedDetection)) {
+				g_Layer->UpdateCombedDetection();
+			}
+			if (!g_Layer->m_CombedDetection) {
+				ImGui::BeginDisabled();
+			}
+			ImGui::Indent();
+			HelpMarker("CTRL+click to input threshold."); ImGui::SameLine();
+			ImGui::SetNextItemWidth(-FLT_MIN);
+			if (ImGui::SliderInt("##Threshold", &g_Layer->m_CombedThreshold, 0, 256, nullptr, ImGuiSliderFlags_AlwaysClamp)) {
+				g_Layer->UpdateCombedThreshold();
+			}
+			ImGui::Unindent();
+			if (!g_Layer->m_CombedDetection) {
+				ImGui::EndDisabled();
+			}
+			if (!g_Layer->m_ProjectOpened) {
+				ImGui::EndDisabled();
 			}
 			ImGui::EndMenu();
 		}
