@@ -1,7 +1,7 @@
 project "WalnutApp"
    kind "ConsoleApp"
    language "C++"
-   cppdialect "C++17"
+   cppdialect "C++20"
    targetdir "bin/%{cfg.buildcfg}"
    staticruntime "off"
 
@@ -26,15 +26,17 @@ project "WalnutApp"
 
     links
     {
-        "Walnut"
+        "Walnut",
+        "imgui",
+        "glfw",
+        "libp2p",
+        "miniz",
     }
-    if string.find(_ACTION, "gmake") then
-       -- Premake5 is about to generate gmake or gmake2 build Makefiles, and
-       -- Makefile support is still new and it does not generate "links" for
-       -- the dependencies needed by Walnut. Add the Linux libs in this case:
-       if os.istarget("linux") then
-          links { "imgui", "glfw", "vulkan", "libp2p", "miniz", "vapoursynth", "vapoursynth-script" }
-       end
+    if os.istarget("windows") then
+      links { "%{LibraryDir.vapoursynth}/vapoursynth.lib", "%{LibraryDir.vapoursynth}/vsscript.lib" }
+    end
+    if os.istarget("linux") then
+      links { "vapoursynth", "vapoursynth-script" }
     end
 
    targetdir ("../bin/" .. outputdir .. "/%{prj.name}")

@@ -293,7 +293,7 @@ public:
 		ImGui::SameLine(); HelpMarker("CTRL+click to input value.");
 
 		ImGui::End();
-		ImGui::ShowDemoWindow();
+		//ImGui::ShowDemoWindow();
 
 		if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
 			if (m_ProjectFile.empty()) {
