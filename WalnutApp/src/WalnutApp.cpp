@@ -62,6 +62,11 @@ struct TextCallbackData {
 	void* layer;
 };
 
+enum NoMatchHandling {
+	PREVIOUS,
+	NEXT
+};
+
 class ExampleLayer : public Walnut::Layer
 {
 public:
@@ -378,6 +383,12 @@ public:
 		std::string decompressed = gzip::decompress(compressed.data(), inputSize);
 		m_JsonProps = json::parse(decompressed);
 		SetDefault(m_JsonProps, "no_match_handling", json::object());
+		SetDefault(m_JsonProps, "no_match_handling_default", std::string("Previous"));
+		if (m_JsonProps["no_match_handling_default"] == "Next") {
+			m_NoMatchHandling = NoMatchHandling::NEXT;
+		} else {
+			m_NoMatchHandling = NoMatchHandling::PREVIOUS;
+		}
 		SetDefault(m_JsonProps, "project_garbage", json::object());
 		SetDefault(m_JsonProps, "extra_attributes", json::object());
 
@@ -407,6 +418,7 @@ public:
 		m_JsonProps = R"({
 			"ivtc_actions": [],
 			"no_match_handling": {},
+			"no_match_handling_default": "Previous",
 			"project_garbage": {
 				"version": 1,
 				"auto_reload": true,
@@ -457,10 +469,26 @@ public:
 		m_JsonProps["project_garbage"]["combed_threshold"] = m_CombedThreshold;
 	}
 
+	void UpdateNoMatchHandling() {
+		std::string newMatchString;
+		if (m_NoMatchHandling == NoMatchHandling::PREVIOUS) {
+			newMatchString = "Previous";
+		} else {
+			newMatchString = "Next";
+		}
+		m_JsonProps["no_match_handling_default"] = newMatchString;
+		auto newNoMatchHandling = json::object();
+		auto& oldNoMatchHandling = m_JsonProps["no_match_handling"];
+		// TODO iterate through all cycles and add evaluate every instance where there are no matches
+		m_JsonProps["no_match_handling"] = newNoMatchHandling;
+		AutoLoadFrames();
+	}
+
 	bool m_AutoReload = true;
 	bool m_ProjectOpened = false;
 	bool m_CombedDetection = false;
 	int m_CombedThreshold = 45;
+	int m_NoMatchHandling = NoMatchHandling::PREVIOUS;
 
 private:
 	const VSAPI* m_VSAPI = nullptr;
@@ -692,11 +720,15 @@ private:
 			auto activeFrame = std::to_string(m_ActiveCycle * 4 + i);
 			if (!io.WantCaptureKeyboard) { // Only enable hotkeys while text inputs are not capturing input
 				if (ImGui::IsKeyPressed(ImGuiKey_F)) {
-					auto& no_match_handling = m_JsonProps["no_match_handling"];
-					if (no_match_handling.contains(activeFrame)) {
-						no_match_handling.erase(activeFrame);
+					auto& noMatchHandling = m_JsonProps["no_match_handling"];
+					if (noMatchHandling.contains(activeFrame)) {
+						noMatchHandling.erase(activeFrame);
 					} else {
-						no_match_handling[activeFrame] = "Next";
+						if (m_NoMatchHandling == NoMatchHandling::PREVIOUS) {
+							noMatchHandling[activeFrame] = "Next";
+						} else {
+							noMatchHandling[activeFrame] = "Previous";
+						}
 					}
 					AutoLoadFrames();
 				}
@@ -944,6 +976,16 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 			if (!g_Layer->m_CombedDetection) {
 				ImGui::EndDisabled();
 			}
+			ImGui::Text("No Match Default");
+			ImGui::Indent();
+			if (ImGui::RadioButton("Previous", &g_Layer->m_NoMatchHandling, NoMatchHandling::PREVIOUS)) {
+				g_Layer->UpdateNoMatchHandling();
+			}
+			ImGui::SameLine();
+			if (ImGui::RadioButton("Next", &g_Layer->m_NoMatchHandling, NoMatchHandling::NEXT)) {
+				g_Layer->UpdateNoMatchHandling();
+			}
+			ImGui::Unindent();
 			if (!g_Layer->m_ProjectOpened) {
 				ImGui::EndDisabled();
 			}
