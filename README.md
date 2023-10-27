@@ -43,13 +43,13 @@ Users are expected to have a working Vapoursynth installation (portable is fine)
 
 Additionally the [IVTC DN plugin](https://github.com/Mikewando/IVTC-DN-plugin) is required and must be placed somewhere that Vapoursynth will [autoload](https://www.vapoursynth.com/doc/installation.html#plugin-autoloading). Similarly for combing detection the [dmetrics plugin](https://github.com/vapoursynth/dmetrics) is required.
 
-IVTC DN projects are based on input Vapoursynth scripts, so you must have such a script to use the tool. The script must output a `YUV` or `RGB` clip with the `_FieldBased` property set to `1` (bottom field first) or `2` (top field first). The property may be set the source filter (e.g. `d2v.Source()`) or it can be set manually (e.g. `std.SetFrameProps(_FieldBased=2)`). Example input script:
+IVTC DN projects are based on input Vapoursynth scripts, so you must have such a script to use the tool. The script must output a `YUV` or `RGB` clip with the `_FieldBased` property set to `1` (bottom field first) or `2` (top field first). The property may be set the source filter (e.g. `d2v.Source()`) or it can be set manually (e.g. `std.SetFieldBased(vs.FIELD_TOP)`). Example input script:
 
 ```python
 import vapoursynth as vs
 
-clip = vs.core.ffms2.Source("example.mkv") # Load telecined source video
-clip = clip.std.SetFrameProps(_FieldBased=2) # Manually set TFF
+clip = vs.core.lsmas.LWLibavSource("example.mkv") # Load telecined source video
+clip = clip.std.SetFieldBased(vs.FIELD_TOP) # Manually set TFF
 clip.set_output() # Output is field-based telecined content
 ```
 
@@ -78,9 +78,9 @@ Using the project file in an output script is straightforward. The [IVTC DN plug
 ```python
 import vapoursynth as vs
 
-clip = vs.core.ffms2.Source("example.mkv") # Load telecined source video
-clip = clip.std.SetFrameProps(_FieldBased=2) # Manually set TFF
-clip = clip.std.SeparateFields() # You could also omit the previous line and set tff=1 here
+clip = vs.core.lsmas.LWLibavSource("example.mkv") # Load telecined source video
+clip = clip.std.SetFieldBased(vs.FIELD_TOP) # Manually set TFF
+clip = clip.std.SeparateFields() # IVTC DN requires separated fields as input
 clip = clip.ivtcdn.IVTC("example.ivtc") # Use the IVTC DN project file
 clip.set_output() # Output is progressive and IVTC'd content
 ```
