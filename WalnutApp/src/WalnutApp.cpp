@@ -301,11 +301,7 @@ public:
 		//ImGui::ShowDemoWindow();
 
 		if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
-			if (m_ProjectFile.empty()) {
-				SaveProjectAsDialog();
-			} else {
-				SaveJson();
-			}
+			SaveJson();
 		}
 
 		if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O)) {
@@ -446,7 +442,7 @@ public:
 
 	void SaveJson() {
 		if (m_ProjectFile.empty()) {
-			return;
+			SaveProjectAsDialog();
 		}
 
 		m_JsonProps["project_garbage"]["active_cycle"] = m_ActiveCycle;
