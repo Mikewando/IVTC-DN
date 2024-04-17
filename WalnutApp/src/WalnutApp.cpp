@@ -385,6 +385,7 @@ public:
 		} else {
 			m_NoMatchHandling = NoMatchHandling::PREVIOUS;
 		}
+		m_TopFieldFirst = SetDefault(m_JsonProps, "tff", true);
 		SetDefault(m_JsonProps, "project_garbage", json::object());
 		SetDefault(m_JsonProps, "extra_attributes", json::object());
 
@@ -413,6 +414,7 @@ public:
 		m_ProjectFile = "";
 		m_JsonProps = R"({
 			"ivtc_actions": [],
+			"tff": true,
 			"no_match_handling": {},
 			"no_match_handling_default": "Previous",
 			"project_garbage": {
@@ -433,10 +435,13 @@ public:
 			m_JsonProps["project_garbage"]["notes"][i] = notes[i % 10];
 		}
 		LoadFrames();
+		// TODO this is increasingly redundant with OpenProject, should probably delegate
 		m_ActiveCycle = 0;
 		m_AutoReload = true;
 		m_CombedDetection = false;
 		m_CombedThreshold = 45;
+		m_NoMatchHandling = NoMatchHandling::PREVIOUS;
+		m_TopFieldFirst = true;
 		m_ProjectOpened = true;
 	}
 
@@ -458,7 +463,7 @@ public:
 
 	void UpdateCombedDetection() {
 		m_JsonProps["project_garbage"]["combed_detection"] = m_CombedDetection;
-		LoadFrames();
+		AutoLoadFrames();
 	}
 
 	void UpdateCombedThreshold() {
@@ -480,11 +485,17 @@ public:
 		AutoLoadFrames();
 	}
 
+	void UpdateTopFieldFirst() {
+		m_JsonProps["tff"] = m_TopFieldFirst;
+		AutoLoadFrames();
+	}
+
 	bool m_AutoReload = true;
 	bool m_ProjectOpened = false;
 	bool m_CombedDetection = false;
 	int m_CombedThreshold = 45;
 	int m_NoMatchHandling = NoMatchHandling::PREVIOUS;
+	bool m_TopFieldFirst = true;
 
 private:
 	const VSAPI* m_VSAPI = nullptr;
@@ -982,6 +993,9 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 				g_Layer->UpdateNoMatchHandling();
 			}
 			ImGui::Unindent();
+			if (ImGui::Checkbox("Top Field First", &g_Layer->m_TopFieldFirst)) {
+				g_Layer->UpdateTopFieldFirst();
+			}
 			if (!g_Layer->m_ProjectOpened) {
 				ImGui::EndDisabled();
 			}
