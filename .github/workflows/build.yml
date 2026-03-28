@@ -14,13 +14,13 @@ jobs:
         with:
           submodules: recursive
       - name: Setup premake
-        uses: abel0b/setup-premake@v2.2
+        uses: abel0b/setup-premake@v2.4
         with:
           version: 5.0.0-beta2
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v1.0.2
+        uses: microsoft/setup-msbuild@v3
       - name: Prepare Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.0
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
         with:
           vulkan-query-version: latest
           vulkan-components: Vulkan-Headers, Vulkan-Loader
@@ -46,32 +46,13 @@ jobs:
         with:
           submodules: recursive
       - name: Setup premake
-        uses: abel0b/setup-premake@v2.2
+        uses: abel0b/setup-premake@v2.4
         with:
           version: 5.0.0-beta2
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install libglfw3-dev mesa-vulkan-drivers vulkan-tools cython3 
-      - name: Install VapourSynth
-        run: |
-          git clone https://github.com/vapoursynth/vapoursynth --depth 1
-          pushd vapoursynth
-          git clone https://github.com/sekrit-twc/zimg --branch v3.0 --depth 1
-          pushd zimg
-          ./autogen.sh
-          ./configure --prefix=/usr
-          make -j2
-          sudo make install -j2
-          popd
-          rm -rf zimg
-
-          ./autogen.sh
-          ./configure --prefix=/usr
-          make -j2
-          sudo make install -j2
-          popd
-          rm -rf vapoursynth
       - name: Prepare Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2.0
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
         with:
           vulkan-query-version: latest
           vulkan-components: Vulkan-Headers, Vulkan-Loader
