@@ -32,7 +32,7 @@ jobs:
       - name: Copy imgui.ini
         run: cp example/imgui.ini bin/Dist-windows-x86_64/IVTCDN/imgui.ini
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: IVTCDN-windows
           path: |
@@ -83,7 +83,7 @@ jobs:
       - name: Copy imgui.ini
         run: cp example/imgui.ini bin/Dist-linux-x86_64/IVTCDN/imgui.ini
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: IVTCDN-linux
           path: |
