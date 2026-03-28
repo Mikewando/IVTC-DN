@@ -24,6 +24,51 @@ using nlohmann::json;
 
 ImFont* g_UbuntuMonoFont = nullptr;
 
+// From vapoursynth sdk's vsscript_example.c
+typedef VS_CC const VSSCRIPTAPI *(*getVSScriptAPIType)(int);
+typedef VS_CC const char *(*getVSScriptAPILastErrorType)();
+
+getVSScriptAPIType getVSScriptAPIFunc = NULL;
+getVSScriptAPILastErrorType getVSScriptAPILastErrorFunc = NULL;
+
+static int loadVSScriptLibrary() {
+#ifdef _WIN32
+    const wchar_t *vsscriptPath = _wgetenv(L"VSSCRIPT_PATH");
+    HMODULE lib = LoadLibraryExW(vsscriptPath ? vsscriptPath : L"VSScript.dll", NULL, LOAD_WITH_ALTERED_SEARCH_PATH);
+    if (!lib) {
+        fprintf(stderr, "Failed to load VSScript library");
+        return 1;
+    }
+    getVSScriptAPIFunc = (getVSScriptAPIType)GetProcAddress(lib, "getVSScriptAPI");
+    getVSScriptAPILastErrorFunc = (getVSScriptAPILastErrorType)GetProcAddress(lib, "getVSScriptAPILastError");
+    if (!getVSScriptAPIFunc || !getVSScriptAPILastErrorFunc) {
+        fprintf(stderr, "Failed to locate entry points in VSScript library");
+        return 1;
+    }
+    return 0;
+#else
+    const char *vsscriptPath = getenv(L"VSSCRIPT_PATH");
+#ifdef __APPLE__
+    const char *defaultLibName = "libvsscript.4.dylib";
+#else
+    const char *defaultLibName = "libvsscript.so.4";
+#endif
+    void *lib = dlopen(vsscriptPath ? vsscriptPath : defaultLibName, RTLD_LAZY | RTLD_GLOBAL);
+    if (!lib) {
+        fprintf(stderr, "Failed to load VSScript library: %s\n", dlerror());
+        return 1;
+    }
+    getVSScriptAPIFunc = (getVSScriptAPIType)dlsym(lib, "getVSScriptAPI");
+    getVSScriptAPILastErrorFunc = (getVSScriptAPILastErrorType)dlsym(lib, "getVSScriptAPILastError");
+    if (!getVSScriptAPIFunc || !getVSScriptAPILastErrorFunc) {
+        fprintf(stderr, "Failed to locate entry points in VSScript library: %s\n", dlerror());
+        return 1;
+    }
+    return 0;
+
+#endif
+}
+
 // Helper to display a little (?) mark which shows a tooltip when hovered.
 // In your own code you may want to display an actual icon if you are using a merged icon fonts (see docs/FONTS.md)
 static void HelpMarker(const char* desc)
@@ -316,7 +361,8 @@ public:
 	}
 
 	ExampleLayer() {
-		m_VSSAPI = getVSScriptAPI(VSSCRIPT_API_VERSION);
+		loadVSScriptLibrary();
+		m_VSSAPI = getVSScriptAPIFunc(VSSCRIPT_API_VERSION);
 		if (!m_VSSAPI) {
 			// VapourSynth probably isn't properly installed at all
 			fprintf(stderr, "Failed to initialize VSScript library\n");

@@ -32,11 +32,8 @@ project "IVTCDN"
         "libp2p",
         "miniz",
     }
-    if os.istarget("windows") then
-      links { "%{LibraryDir.vapoursynth}/vapoursynth.lib", "%{LibraryDir.vapoursynth}/vsscript.lib" }
-    end
     if os.istarget("linux") then
-      links { "vulkan", "vapoursynth", "vapoursynth-script" }
+      links { "vulkan" }
     end
 
    targetdir ("../bin/" .. outputdir .. "/%{prj.name}")

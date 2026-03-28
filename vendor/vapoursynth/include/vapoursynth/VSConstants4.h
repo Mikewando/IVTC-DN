@@ -21,10 +21,21 @@
 #ifndef VSCONSTANTS4_H
 #define VSCONSTANTS4_H
 
+#if defined(VS_USE_LATEST_API) || defined(VS_USE_API_42)
+
+typedef enum VSRange {
+	VSC_RANGE_FULL = 1,
+	VSC_RANGE_LIMITED = 0
+} VSRange;
+
+#else
+
 typedef enum VSColorRange {
 	VSC_RANGE_FULL = 0,
 	VSC_RANGE_LIMITED = 1
 } VSColorRange;
+
+#endif
 
 typedef enum VSChromaLocation {
 	VSC_CHROMA_LEFT = 0,
@@ -72,6 +83,7 @@ typedef enum VSTransferCharacteristics {
 	VSC_TRANSFER_BT2020_10 = 14, /* Equivalent to 1. */
 	VSC_TRANSFER_BT2020_12 = 15, /* Equivalent to 1. */
 	VSC_TRANSFER_ST2084 = 16,
+	VSC_TRANSFER_ST428 = 17,
 	VSC_TRANSFER_ARIB_B67 = 18
 } VSTransferCharacteristics;
 
